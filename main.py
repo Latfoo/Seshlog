@@ -2,7 +2,6 @@ from fastapi import FastAPI, HTTPException
 from sqlmodel import SQLModel, create_engine, Session, Field
 from dotenv import load_dotenv
 
-from typing import Optional
 from datetime import datetime
 
 import os
@@ -44,15 +43,27 @@ def on_startup():
 def read_root():
     return {"message": "This is the pomodoro backend!"}
 
+
 @app.get("/health")
 def read_health():
     return {"status": "healthy"}
 
-@app.post("/sessions", status_code=201)
+
+@app.post("/createSession", status_code=201)
 def create_session(data: PomodoroSessionCreate):
-    session = PomodoroSession(**data.model_dump())
+    new_session = PomodoroSession(**data.model_dump())
     with Session(engine) as db:
-        db.add(session)
+        db.add(new_session)
         db.commit()
-        db.refresh(session)
-        return session
+        db.refresh(new_session)
+        return new_session
+    
+    
+app.delete("/deleteSession/{session_id}", status_code=204)
+def delete_session(session_id: int):
+    with Session(engine) as db:
+        session = db.get(PomodoroSession, session_id)
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+        db.delete(session)
+        db.commit()
