@@ -6,6 +6,9 @@ from datetime import datetime
 
 import os
 
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+
 # Database setup
 load_dotenv()
 DATABASE_URL = os.getenv("DATABASE_URL")
@@ -31,6 +34,11 @@ class PomodoroSessionCreate(PomodoroSessionBase):
 # FastAPI initialization
 app = FastAPI(title="Pomodoro Backend", description="A backend for a pomodoro timer application")
 
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+@app.get("/")
+def root():
+    return FileResponse("static/index.html")
 
 # Create the database tables on startup
 @app.on_event("startup")
