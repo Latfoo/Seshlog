@@ -59,7 +59,7 @@ def create_session(data: PomodoroSessionCreate):
         return new_session
     
     
-app.delete("/deleteSession/{session_id}", status_code=204)
+@app.delete("/deleteSession/{session_id}", status_code=204)
 def delete_session(session_id: int):
     with Session(engine) as db:
         session = db.get(PomodoroSession, session_id)
@@ -67,3 +67,4 @@ def delete_session(session_id: int):
             raise HTTPException(status_code=404, detail="Session not found")
         db.delete(session)
         db.commit()
+
