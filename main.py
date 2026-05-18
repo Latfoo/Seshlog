@@ -1,5 +1,5 @@
 from fastapi import FastAPI, HTTPException, Path
-from sqlmodel import SQLModel, create_engine, Session, Field
+from sqlmodel import SQLModel, create_engine, Session, Field, select
 from dotenv import load_dotenv
 
 from datetime import datetime
@@ -67,4 +67,20 @@ def delete_session(session_id: int = Path(..., description="The ID of the sessio
             raise HTTPException(status_code=404, detail="Session not found")
         db.delete(session)
         db.commit()
+
+
+@app.get("/sessions/")
+def get_sessions():
+    with Session(engine) as db:
+        sessions = db.exec(select(PomodoroSession)).all()
+        return sessions
+
+
+@app.get("/sessions/{session_id}")
+def get_session(session_id: int = Path(..., description="The ID of the session to retrieve", gt=0)):
+    with Session(engine) as db:
+        session = db.get(PomodoroSession, session_id)
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+        return session
 
