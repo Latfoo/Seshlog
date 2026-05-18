@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Path
 from sqlmodel import SQLModel, create_engine, Session, Field
 from dotenv import load_dotenv
 
@@ -60,7 +60,7 @@ def create_session(data: PomodoroSessionCreate):
     
     
 @app.delete("/deleteSession/{session_id}", status_code=204)
-def delete_session(session_id: int):
+def delete_session(session_id: int = Path(..., description="The ID of the session to delete", gt=0)):
     with Session(engine) as db:
         session = db.get(PomodoroSession, session_id)
         if not session:
