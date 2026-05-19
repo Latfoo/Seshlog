@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException, Path, Query
 from sqlmodel import SQLModel, create_engine, Session, Field, select, Relationship
+from pydantic import BaseModel
 from dotenv import load_dotenv
 from typing import Optional, List
 from datetime import datetime
@@ -44,25 +45,27 @@ class PomodoroSession(SQLModel, table=True):
 # Schemas (these define what the API accepts / returns)
 # -------------------------------------------------------
 
-class TagRead(SQLModel):
+class TagRead(BaseModel):
     id: int
     name: str
 
 
-class PomodoroSessionCreate(SQLModel):
+class PomodoroSessionCreate(BaseModel):
     task_label: str
     duration_minutes: int
     tags: List[str] = []      # list of tag names, e.g. ["work", "deep-focus"]
 
 
-class PomodoroSessionUpdate(SQLModel):
+class PomodoroSessionUpdate(BaseModel):
     task_label: Optional[str] = None
     duration_minutes: Optional[int] = None
     completed: Optional[bool] = None
     tags: Optional[List[str]] = None   # replaces all tags on the session
 
 
-class PomodoroSessionRead(SQLModel):
+class PomodoroSessionRead(BaseModel):
+    model_config = {"from_attributes": True}
+
     id: int
     task_label: str
     duration_minutes: int
