@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 from typing import Optional, List
 from datetime import datetime
 import os
+from enum import Enum
 
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -31,13 +32,16 @@ class Tag(SQLModel, table=True):
     name: str = Field(unique=True, index=True)
     sessions: List["PomodoroSession"] = Relationship(back_populates="tags", link_model=SessionTagLink)
 
-
+class SessionStatus(str, Enum):
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    PAUSED = "paused"
 class PomodoroSession(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     task_label: str
     duration_minutes: int
     started_at: datetime = Field(default_factory=datetime.now)
-    completed: bool = False
+    status: SessionStatus = Field(default=SessionStatus.IN_PROGRESS)
     tags: List[Tag] = Relationship(back_populates="sessions", link_model=SessionTagLink)
 
 
@@ -59,7 +63,7 @@ class PomodoroSessionCreate(BaseModel):
 class PomodoroSessionUpdate(BaseModel):
     task_label: Optional[str] = None
     duration_minutes: Optional[int] = None
-    completed: Optional[bool] = None
+    status: Optional[SessionStatus] = None
     tags: Optional[List[str]] = None   # replaces all tags on the session
 
 
@@ -70,7 +74,7 @@ class PomodoroSessionRead(BaseModel):
     task_label: str
     duration_minutes: int
     started_at: datetime
-    completed: bool
+    status: SessionStatus
     tags: List[TagRead] = []
 
 
@@ -179,8 +183,8 @@ def update_session(
         if data.duration_minutes is not None:
             session.duration_minutes = data.duration_minutes
 
-        if data.completed is not None:
-            session.completed = data.completed
+        if data.status is not None:
+            session.status = data.status
 
         if data.tags is not None:
             session.tags = get_or_create_tags(db, data.tags)
