@@ -32,10 +32,12 @@ class Tag(SQLModel, table=True):
     name: str = Field(unique=True, index=True)
     sessions: List["PomodoroSession"] = Relationship(back_populates="tags", link_model=SessionTagLink)
 
+
 class SessionStatus(str, Enum):
     IN_PROGRESS = "in_progress"
     COMPLETED = "completed"
     PAUSED = "paused"
+    
 class PomodoroSession(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     task_label: str
@@ -50,6 +52,8 @@ class PomodoroSession(SQLModel, table=True):
 # -------------------------------------------------------
 
 class TagRead(BaseModel):
+    model_config = {"from_attributes": True}
+
     id: int
     name: str
 
