@@ -1,12 +1,96 @@
-# pomodoro-app
+# Pomodoro API
 
-## Database
+A REST API for tracking Pomodoro work sessions, built with FastAPI and PostgreSQL.
 
-The app uses a single PostgreSQL database with three tables.
+Sessions can be labelled, tagged, and filtered by tag, making it easy to see how you spend your time across different topics.
 
-**Why three tables?**
+The repository also includes a browser-based demo UI (built with AI assistance) to interact with the API visually.
 
-Sessions and tags have a many-to-many relationship. A session can have multiple tags, and a tag can belong to multiple sessions. Relational databases cannot express this directly, so a third table (`SessionTagLink`) acts as a bridge that records which sessions are connected to which tags.
+## Features
+
+- Create, update, and delete work sessions
+- Assign multiple tags to a session (many-to-many)
+- Filter session history by tag
+- Session statuses: `in_progress`, `paused`, `completed`
+- Input validation on all endpoints (length limits, allowed characters, value ranges)
+- Auto-generated interactive API docs at `/docs`
+
+## Tech stack
+
+| Layer | Technology |
+|-------|------------|
+| API | FastAPI |
+| ORM | SQLModel (built on SQLAlchemy) |
+| Database | PostgreSQL |
+| Validation | Pydantic v2 |
+
+## Running locally
+
+**1. Clone and set up the environment**
+```bash
+git clone <repo-url>
+cd pomodoro-app
+python -m venv venv
+source venv/bin/activate
+pip install fastapi sqlmodel psycopg2-binary python-dotenv uvicorn
+```
+
+**2. Configure the database**
+
+Create a `.env` file:
+```
+DATABASE_URL=postgresql://user:password@localhost:5432/pomodoro
+```
+
+**3. Start the server**
+```bash
+uvicorn main:app --reload
+```
+
+The API runs at `http://localhost:8000` and the interactive docs are at `http://localhost:8000/docs`.
+
+## API overview
+
+### Sessions
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/sessions` | Create a new session |
+| `GET` | `/sessions` | List all sessions (optional `?tag=` filter) |
+| `GET` | `/sessions/{id}` | Get a single session |
+| `PATCH` | `/sessions/{id}` | Update label, duration, status, or tags |
+| `DELETE` | `/sessions/{id}` | Delete a session |
+
+### Tags
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/tags` | List all tags that have at least one session |
+
+## Example requests
+
+**Create a session**
+```bash
+curl -X POST http://localhost:8000/sessions \
+  -H "Content-Type: application/json" \
+  -d '{"task_label": "Write unit tests", "duration_minutes": 25, "tags": ["work", "backend"]}'
+```
+
+**List sessions filtered by tag**
+```bash
+curl http://localhost:8000/sessions?tag=backend
+```
+
+**Mark a session as completed**
+```bash
+curl -X PATCH http://localhost:8000/sessions/1 \
+  -H "Content-Type: application/json" \
+  -d '{"status": "completed"}'
+```
+
+## Data model
+
+Three tables with a many-to-many relationship between sessions and tags:
 
 ```
 ┌─────────────────────┐         ┌──────────────────┐         ┌─────────────┐
@@ -16,16 +100,8 @@ Sessions and tags have a many-to-many relationship. A session can have multiple 
 │ task_label          │         │ tag_id           │────────►│ name        │
 │ duration_minutes    │         └──────────────────┘         └─────────────┘
 │ started_at          │
-│ completed           │
+│ status              │
 └─────────────────────┘
 ```
 
-The bridge table only stores IDs. Each row means "this session is connected to this tag". Example:
-
-```
-session 1 -- link (session_id=1, tag_id=2) -- tag "work"
-session 1 -- link (session_id=1, tag_id=3) -- tag "study"
-session 2 -- link (session_id=2, tag_id=2) -- tag "work"
-```
-
-Session 1 has two tags. "work" is shared between session 1 and session 2, stored as a single row in the Tag table, not a duplicate.
+Tags are stored once and reused across sessions. Deleting a session automatically cleans up any orphaned tags.
