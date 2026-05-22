@@ -194,11 +194,7 @@ tagInput.addEventListener("keydown", (event) => {
 document.getElementById("tags-wrap").addEventListener("click", () => tagInput.focus());
 // Timer buttons
 btnStart.addEventListener("click", async () => {
-    const label = taskInput.value.trim();
-    if (label === "") {
-        taskInput.focus();
-        return;
-    }
+    const label = taskInput.value.trim() || "Pomodoro Session";
     btnStart.disabled = true;
     try {
         activeSession = await apiCreateSession(label, Number(durationSel.value), pendingTags);
