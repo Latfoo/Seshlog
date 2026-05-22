@@ -9,8 +9,14 @@
 <body>
 
   <header>
-    <span class="logo">&#127813;</span>
-    <h1>Pomodoro</h1>
+    <div class="header-left">
+      <span class="logo">&#127813;</span>
+      <h1>Pomodoro</h1>
+    </div>
+    <div class="header-user" id="header-user" hidden>
+      <span class="header-username" id="header-username"></span>
+      <button class="btn-logout" id="btn-logout">Log out</button>
+    </div>
   </header>
 
   <main>
@@ -93,6 +99,32 @@
     </section>
 
   </main>
+
+  <!-- Auth modal — shown on load if not logged in -->
+  <div class="modal-overlay" id="auth-modal" hidden>
+    <div class="modal-card">
+      <span class="modal-logo">&#127813;</span>
+      <h2 class="modal-title">Pomodoro</h2>
+
+      <div class="modal-tabs">
+        <button class="tab-btn active" id="tab-login">Log In</button>
+        <button class="tab-btn" id="tab-register">Register</button>
+      </div>
+
+      <form id="auth-form">
+        <div class="form-field">
+          <label for="auth-username">Username</label>
+          <input id="auth-username" type="text" autocomplete="username" required />
+        </div>
+        <div class="form-field">
+          <label for="auth-password">Password</label>
+          <input id="auth-password" type="password" autocomplete="current-password" required />
+        </div>
+        <p class="auth-error" id="auth-error"></p>
+        <button type="submit" class="btn primary auth-submit" id="auth-submit">Log In</button>
+      </form>
+    </div>
+  </div>
 
   <script src="/static/app.js"></script>
 </body>
