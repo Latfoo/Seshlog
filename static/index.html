@@ -1,12 +1,90 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pomodoro App</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pomodoro</title>
+  <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
-    <h1>Welcome to the Pomodoro App</h1>
-    <p>This is a simple application to help you manage your time using the Pomodoro technique.</p>
+
+  <header>
+    <span class="logo">&#127813;</span>
+    <h1>Pomodoro</h1>
+  </header>
+
+  <main>
+
+    <section class="timer-section">
+      <div class="card">
+
+        <input
+          id="task-input"
+          class="task-input"
+          type="text"
+          placeholder="What are you working on?"
+          autocomplete="off"
+          maxlength="100"
+        >
+
+        <div class="timer-wrap">
+          <svg viewBox="0 0 200 200" id="timer-svg" aria-hidden="true">
+            <circle class="ring-bg"       cx="100" cy="100" r="80" />
+            <circle class="ring-progress" cx="100" cy="100" r="80" id="ring-progress" />
+          </svg>
+          <span class="timer-time" id="timer-time">25:00</span>
+        </div>
+
+        <div class="settings-row">
+          <div class="field">
+            <label for="duration">Duration</label>
+            <select id="duration">
+              <option value="5">5 min</option>
+              <option value="10">10 min</option>
+              <option value="15">15 min</option>
+              <option value="25" selected>25 min</option>
+              <option value="30">30 min</option>
+              <option value="45">45 min</option>
+              <option value="60">60 min</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label>Tags</label>
+            <div class="tags-wrap" id="tags-wrap">
+              <div class="chips" id="chips"></div>
+              <input
+                id="tag-input"
+                type="text"
+                placeholder="Add tag…"
+                autocomplete="off"
+                maxlength="30"
+              >
+            </div>
+          </div>
+        </div>
+
+        <div class="controls">
+          <button id="btn-start" class="btn primary">Start</button>
+          <button id="btn-pause" class="btn secondary" hidden>Pause</button>
+          <button id="btn-done"  class="btn success"   hidden>Done</button>
+        </div>
+
+      </div>
+    </section>
+
+    <section class="history-section">
+      <div class="history-head">
+        <h2>Sessions</h2>
+        <div class="filters" id="filters"></div>
+      </div>
+      <div class="sessions" id="sessions">
+        <p class="empty">No sessions yet — start your first Pomodoro!</p>
+      </div>
+    </section>
+
+  </main>
+
+  <script src="/static/app.js"></script>
 </body>
 </html>
