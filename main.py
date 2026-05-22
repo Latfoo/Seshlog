@@ -1,10 +1,11 @@
 from fastapi import FastAPI, HTTPException, Path, Query
 from sqlmodel import SQLModel, create_engine, Session, Field, select, Relationship
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from dotenv import load_dotenv
 from typing import Optional, List
 from datetime import datetime
 import os
+import re
 from enum import Enum
 
 from fastapi.staticfiles import StaticFiles
@@ -51,6 +52,28 @@ class PomodoroSession(SQLModel, table=True):
 # Schemas (these define what the API accepts / returns)
 # -------------------------------------------------------
 
+# Tags may only contain lowercase letters, digits, hyphens, and underscores.
+# They must start with a letter or digit (not a hyphen/underscore).
+_TAG_PATTERN = re.compile(r'^[a-z0-9][a-z0-9\-_]*$')
+
+
+def _clean_tags(tags: List[str]) -> List[str]:
+    """Lowercase, strip whitespace, and validate each tag name."""
+    result = []
+    for raw in tags:
+        tag = raw.strip().lower()
+        if not tag:
+            continue  # skip blank entries
+        if len(tag) > 50:
+            raise ValueError("Each tag must be 50 characters or fewer")
+        if not _TAG_PATTERN.match(tag):
+            raise ValueError(
+                f"Invalid tag '{tag}'. Tags may only contain letters, digits, hyphens, and underscores"
+            )
+        result.append(tag)
+    return result
+
+
 class TagRead(BaseModel):
     model_config = {"from_attributes": True}
 
@@ -59,16 +82,46 @@ class TagRead(BaseModel):
 
 
 class PomodoroSessionCreate(BaseModel):
-    task_label: str
-    duration_minutes: int
-    tags: List[str] = []      # list of tag names, e.g. ["work", "deep-focus"]
+    task_label: str = Field(min_length=1, max_length=200)
+    duration_minutes: int = Field(ge=1, le=480)
+    tags: List[str] = Field(default=[], max_length=20)
+
+    @field_validator("task_label")
+    @classmethod
+    def strip_task_label(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Task label cannot be blank")
+        return v
+
+    @field_validator("tags")
+    @classmethod
+    def validate_tags(cls, v: List[str]) -> List[str]:
+        return _clean_tags(v)
 
 
 class PomodoroSessionUpdate(BaseModel):
-    task_label: Optional[str] = None
-    duration_minutes: Optional[int] = None
+    task_label: Optional[str] = Field(default=None, min_length=1, max_length=200)
+    duration_minutes: Optional[int] = Field(default=None, ge=1, le=480)
     status: Optional[SessionStatus] = None
-    tags: Optional[List[str]] = None   # replaces all tags on the session
+    tags: Optional[List[str]] = Field(default=None, max_length=20)
+
+    @field_validator("task_label")
+    @classmethod
+    def strip_task_label(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        v = v.strip()
+        if not v:
+            raise ValueError("Task label cannot be blank")
+        return v
+
+    @field_validator("tags")
+    @classmethod
+    def validate_tags(cls, v: Optional[List[str]]) -> Optional[List[str]]:
+        if v is None:
+            return v
+        return _clean_tags(v)
 
 
 class PomodoroSessionRead(BaseModel):
