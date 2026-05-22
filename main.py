@@ -34,16 +34,16 @@ class Tag(SQLModel, table=True):
 
 
 class SessionStatus(str, Enum):
-    IN_PROGRESS = "in_progress"
-    COMPLETED = "completed"
-    PAUSED = "paused"
+    in_progress = "in_progress"
+    completed = "completed"
+    paused = "paused"
     
 class PomodoroSession(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     task_label: str
     duration_minutes: int
     started_at: datetime = Field(default_factory=datetime.now)
-    status: SessionStatus = Field(default=SessionStatus.IN_PROGRESS)
+    status: SessionStatus = Field(default=SessionStatus.in_progress)
     tags: List[Tag] = Relationship(back_populates="sessions", link_model=SessionTagLink)
 
 
@@ -146,6 +146,7 @@ def create_session(data: PomodoroSessionCreate):
         db.add(new_session)
         db.commit()
         db.refresh(new_session)
+        _ = new_session.tags  # load tags into memory before session closes
         return new_session
 
 
@@ -159,6 +160,8 @@ def list_sessions(tag: Optional[str] = Query(default=None, description="Filter b
             query = query.join(SessionTagLink).join(Tag).where(Tag.name == tag)
 
         sessions = db.exec(query).all()
+        for s in sessions:
+            _ = s.tags  # load tags into memory before session closes
         return sessions
 
 
@@ -168,6 +171,7 @@ def get_session(session_id: int = Path(..., gt=0, description="ID of the session
         session = db.get(PomodoroSession, session_id)
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
+        _ = session.tags  # load tags into memory before session closes
         return session
 
 
@@ -196,6 +200,7 @@ def update_session(
         db.add(session)
         db.commit()
         db.refresh(session)
+        _ = session.tags  # load tags into memory before session closes
         return session
 
 
