@@ -1,21 +1,83 @@
 "use strict";
-// Types
+
+// Token storage
+// The JWT returned by the backend is kept in localStorage so it survives page refreshes.
+// The username is stored separately because decoding the JWT would need a library.
+
+function getToken() {
+    return localStorage.getItem("token");
+}
+function setToken(token) {
+    localStorage.setItem("token", token);
+}
+function clearToken() {
+    localStorage.removeItem("token");
+    localStorage.removeItem("username");
+}
+function getSavedUsername() {
+    return localStorage.getItem("username") ?? "";
+}
+function saveUsername(username) {
+    localStorage.setItem("username", username);
+}
+
 // API helpers
+
 async function fetchJson(url, method = "GET", body) {
-    const options = {
-        method: method,
-        headers: { "Content-Type": "application/json" },
-    };
-    if (body !== undefined) {
-        options.body = JSON.stringify(body);
-    }
+    const headers = { "Content-Type": "application/json" };
+
+    // Attach the JWT to every request so the backend knows who is calling.
+    const token = getToken();
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+
+    const options = { method, headers };
+    if (body !== undefined) options.body = JSON.stringify(body);
+
     const response = await fetch(url, options);
-    if (!response.ok)
-        throw new Error(`Request failed: ${response.status}`);
-    if (response.status === 204)
-        return null; // 204 = No Content (e.g. DELETE)
+
+    // 401 means the token is missing or expired — send the user back to the login screen.
+    if (response.status === 401) {
+        clearToken();
+        showAuthModal();
+        throw new Error("Session expired — please log in again");
+    }
+
+    if (!response.ok) throw new Error(`Request failed: ${response.status}`);
+    if (response.status === 204) return null;  // 204 = No Content (e.g. DELETE)
     return response.json();
 }
+
+// Auth API calls use plain fetch (not fetchJson) so a wrong password doesn't
+// trigger the "session expired" redirect that fetchJson does on 401.
+
+async function apiLogin(username, password) {
+    const response = await fetch("/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+    });
+    if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.detail ?? "Login failed — check your username and password");
+    }
+    const data = await response.json();
+    return data.access_token;
+}
+
+async function apiRegister(username, password) {
+    const response = await fetch("/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+    });
+    if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.detail ?? "Registration failed");
+    }
+    const data = await response.json();
+    return data.access_token;
+}
+
 async function apiCreateSession(taskLabel, durationMinutes, tags) {
     return fetchJson("/sessions", "POST", {
         task_label: taskLabel,
@@ -36,31 +98,49 @@ async function apiDeleteSession(id) {
 async function apiListTags() {
     return fetchJson("/tags");
 }
+
 // State
 let activeSession = null;
 let timerIntervalId = null;
 let remainingSeconds = 0;
 let totalSeconds = 0;
 let isBreak = false;
-let pendingTags = []; // tags typed into the tag input, not yet saved
+let pendingTags = [];   // tags typed into the tag input, not yet saved
 let activeTagFilter = ""; // the tag filter currently selected in history
+
 // Circumference of the SVG ring (radius = 80)
 const RING_CIRCUMFERENCE = 2 * Math.PI * 80;
+
 // DOM elements
-const taskInput = document.getElementById("task-input");
-const durationSel = document.getElementById("duration");
+const taskInput        = document.getElementById("task-input");
+const durationSel      = document.getElementById("duration");
 const breakDurationSel = document.getElementById("break-duration");
-const timerModeEl = document.getElementById("timer-mode");
-const tagInput = document.getElementById("tag-input");
-const chipsEl = document.getElementById("chips");
-const timerTimeEl = document.getElementById("timer-time");
-const ringEl = document.getElementById("ring-progress");
-const btnStart = document.getElementById("btn-start");
-const btnPause = document.getElementById("btn-pause");
-const btnDone = document.getElementById("btn-done");
-const sessionsEl = document.getElementById("sessions");
-const filtersEl = document.getElementById("filters");
+const timerModeEl      = document.getElementById("timer-mode");
+const tagInput         = document.getElementById("tag-input");
+const chipsEl          = document.getElementById("chips");
+const timerTimeEl      = document.getElementById("timer-time");
+const ringEl           = document.getElementById("ring-progress");
+const btnStart         = document.getElementById("btn-start");
+const btnPause         = document.getElementById("btn-pause");
+const btnDone          = document.getElementById("btn-done");
+const sessionsEl       = document.getElementById("sessions");
+const filtersEl        = document.getElementById("filters");
+
+// Auth modal elements
+const authModal     = document.getElementById("auth-modal");
+const authForm      = document.getElementById("auth-form");
+const authUserInput = document.getElementById("auth-username");
+const authPassInput = document.getElementById("auth-password");
+const authError     = document.getElementById("auth-error");
+const authSubmit    = document.getElementById("auth-submit");
+const tabLogin      = document.getElementById("tab-login");
+const tabRegister   = document.getElementById("tab-register");
+const headerUser    = document.getElementById("header-user");
+const headerUname   = document.getElementById("header-username");
+const btnLogout     = document.getElementById("btn-logout");
+
 // Timer
+
 function formatTime(seconds) {
     const minutes = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -72,8 +152,7 @@ function updateRing(remaining, total) {
     ringEl.style.strokeDashoffset = String(offset);
 }
 function startTicking() {
-    if (timerIntervalId !== null)
-        clearInterval(timerIntervalId);
+    if (timerIntervalId !== null) clearInterval(timerIntervalId);
     timerIntervalId = window.setInterval(async () => {
         remainingSeconds--;
         timerTimeEl.textContent = formatTime(remainingSeconds);
@@ -84,8 +163,7 @@ function startTicking() {
             if (isBreak) {
                 playBeep();
                 resetTimerUI();
-            }
-            else {
+            } else {
                 if (activeSession !== null) {
                     await apiUpdateSession(activeSession.id, "completed");
                 }
@@ -108,8 +186,7 @@ function playBeep() {
         gain.gain.exponentialRampToValueAtTime(0.001, audio.currentTime + 0.8);
         osc.start();
         osc.stop(audio.currentTime + 0.8);
-    }
-    catch (_) { }
+    } catch (_) {}
 }
 function startBreak() {
     isBreak = true;
@@ -156,7 +233,9 @@ function resetTimerUI() {
     btnPause.textContent = "Pause";
     btnDone.textContent = "Done";
 }
+
 // Tag chip UI
+
 function renderChips() {
     chipsEl.innerHTML = "";
     for (const tag of pendingTags) {
@@ -174,6 +253,7 @@ function renderChips() {
         chipsEl.appendChild(chip);
     }
 }
+
 // Press Enter or comma to add a tag
 tagInput.addEventListener("keydown", (event) => {
     if (event.key === "Enter" || event.key === ",") {
@@ -184,15 +264,80 @@ tagInput.addEventListener("keydown", (event) => {
             renderChips();
         }
         tagInput.value = "";
-    }
-    else if (event.key === "Backspace" && tagInput.value === "" && pendingTags.length > 0) {
+    } else if (event.key === "Backspace" && tagInput.value === "" && pendingTags.length > 0) {
         pendingTags.pop();
         renderChips();
     }
 });
+
 // Clicking anywhere in the tag box should focus the input
 document.getElementById("tags-wrap").addEventListener("click", () => tagInput.focus());
+
+// Auth modal
+
+let authMode = "login";  // "login" or "register"
+
+function showAuthModal() {
+    authModal.hidden = false;
+    authError.textContent = "";
+    authUserInput.value = "";
+    authPassInput.value = "";
+    headerUser.hidden = true;
+}
+
+function hideAuthModal(username) {
+    authModal.hidden = true;
+    headerUser.hidden = false;
+    headerUname.textContent = username;
+}
+
+tabLogin.addEventListener("click", () => {
+    authMode = "login";
+    tabLogin.classList.add("active");
+    tabRegister.classList.remove("active");
+    authSubmit.textContent = "Log In";
+    authError.textContent = "";
+});
+
+tabRegister.addEventListener("click", () => {
+    authMode = "register";
+    tabRegister.classList.add("active");
+    tabLogin.classList.remove("active");
+    authSubmit.textContent = "Register";
+    authError.textContent = "";
+});
+
+authForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const username = authUserInput.value.trim();
+    const password = authPassInput.value;
+    if (!username || !password) return;
+
+    authSubmit.disabled = true;
+    authError.textContent = "";
+
+    try {
+        const token = authMode === "login"
+            ? await apiLogin(username, password)
+            : await apiRegister(username, password);
+        setToken(token);
+        saveUsername(username);
+        hideAuthModal(username);
+        await reloadHistory();
+    } catch (err) {
+        authError.textContent = err.message ?? "Something went wrong";
+    } finally {
+        authSubmit.disabled = false;
+    }
+});
+
+btnLogout.addEventListener("click", () => {
+    clearToken();
+    showAuthModal();
+});
+
 // Timer buttons
+
 btnStart.addEventListener("click", async () => {
     const label = taskInput.value.trim() || "Pomodoro Session";
     btnStart.disabled = true;
@@ -212,18 +357,15 @@ btnStart.addEventListener("click", async () => {
         btnPause.hidden = false;
         btnDone.hidden = false;
         await reloadHistory();
-    }
-    catch (error) {
+    } catch (error) {
         console.error(error);
         alert("Could not start session — is the server running?");
-    }
-    finally {
+    } finally {
         btnStart.disabled = false;
     }
 });
 btnPause.addEventListener("click", async () => {
-    if (activeSession === null)
-        return;
+    if (activeSession === null) return;
     if (timerIntervalId !== null) {
         // currently running, pause it
         clearInterval(timerIntervalId);
@@ -231,8 +373,7 @@ btnPause.addEventListener("click", async () => {
         ringEl.classList.add("paused");
         btnPause.textContent = "Resume";
         await apiUpdateSession(activeSession.id, "paused");
-    }
-    else {
+    } else {
         // currently paused, resume it
         ringEl.classList.remove("paused");
         btnPause.textContent = "Pause";
@@ -250,8 +391,7 @@ btnDone.addEventListener("click", async () => {
         resetTimerUI();
         return;
     }
-    if (activeSession === null)
-        return;
+    if (activeSession === null) return;
     await apiUpdateSession(activeSession.id, "completed");
     resetTimerUI();
     await reloadHistory();
@@ -261,7 +401,9 @@ durationSel.addEventListener("change", () => {
         timerTimeEl.textContent = formatTime(Number(durationSel.value) * 60);
     }
 });
+
 // Session history
+
 function escapeHtml(text) {
     return text
         .replace(/&/g, "&amp;")
@@ -278,8 +420,8 @@ function formatDate(isoString) {
 }
 const STATUS_LABELS = {
     in_progress: "In Progress",
-    completed: "Completed",
-    paused: "Paused",
+    completed:   "Completed",
+    paused:      "Paused",
 };
 function renderSessions(sessions) {
     if (sessions.length === 0) {
@@ -308,8 +450,7 @@ function renderSessions(sessions) {
             <button class="del" title="Delete session">✕</button>
         `;
         card.querySelector(".del").addEventListener("click", async () => {
-            if (!confirm("Delete this session?"))
-                return;
+            if (!confirm("Delete this session?")) return;
             await apiDeleteSession(session.id);
             await reloadHistory();
         });
@@ -342,11 +483,12 @@ async function reloadHistory() {
     renderSessions(sessions);
     renderFilters(tags);
 }
+
 // Timer restoration on page load
+
 async function restoreTimerIfNeeded(sessions) {
     const inProgress = sessions.find(s => s.status === "in_progress");
-    if (!inProgress)
-        return;
+    if (!inProgress) return;
     const startedAt = new Date(inProgress.started_at).getTime();
     const totalMs = inProgress.duration_minutes * 60 * 1000;
     const remaining = Math.round((startedAt + totalMs - Date.now()) / 1000);
@@ -370,12 +512,27 @@ async function restoreTimerIfNeeded(sessions) {
     btnDone.hidden = false;
     startTicking();
 }
+
 // Startup
+
 ringEl.style.strokeDasharray = String(RING_CIRCUMFERENCE);
 ringEl.style.strokeDashoffset = "0";
 timerTimeEl.textContent = formatTime(Number(durationSel.value) * 60);
+
 (async () => {
-    const sessions = await apiListSessions();
-    await restoreTimerIfNeeded(sessions);
-    await reloadHistory();
+    if (!getToken()) {
+        showAuthModal();
+        return;
+    }
+    // Token exists — hide the modal and load data.
+    // If the token is expired the first fetchJson call will return 401,
+    // which clears the token and shows the modal automatically.
+    hideAuthModal(getSavedUsername());
+    try {
+        const sessions = await apiListSessions();
+        await restoreTimerIfNeeded(sessions);
+        await reloadHistory();
+    } catch {
+        // 401 is already handled inside fetchJson
+    }
 })();
