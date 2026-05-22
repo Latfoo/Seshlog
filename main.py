@@ -210,6 +210,10 @@ def delete_session(session_id: int = Path(..., gt=0, description="ID of the sess
         session = db.get(PomodoroSession, session_id)
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
+        # Remove link table rows first so orphaned tags don't linger in the filter bar
+        links = db.exec(select(SessionTagLink).where(SessionTagLink.session_id == session_id)).all()
+        for link in links:
+            db.delete(link)
         db.delete(session)
         db.commit()
 
@@ -221,5 +225,8 @@ def delete_session(session_id: int = Path(..., gt=0, description="ID of the sess
 @app.get("/tags", response_model=List[TagRead])
 def list_tags():
     with Session(engine) as db:
-        tags = db.exec(select(Tag)).all()
+        used_tag_ids = select(SessionTagLink.tag_id)
+        tags = db.exec(
+            select(Tag).where(Tag.id.in_(used_tag_ids))
+        ).all()
         return tags
