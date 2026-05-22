@@ -41,6 +41,7 @@ let activeSession = null;
 let timerIntervalId = null;
 let remainingSeconds = 0;
 let totalSeconds = 0;
+let isBreak = false;
 let pendingTags = []; // tags typed into the tag input, not yet saved
 let activeTagFilter = ""; // the tag filter currently selected in history
 // Circumference of the SVG ring (radius = 80)
@@ -48,6 +49,8 @@ const RING_CIRCUMFERENCE = 2 * Math.PI * 80;
 // DOM elements
 const taskInput = document.getElementById("task-input");
 const durationSel = document.getElementById("duration");
+const breakDurationSel = document.getElementById("break-duration");
+const timerModeEl = document.getElementById("timer-mode");
 const tagInput = document.getElementById("tag-input");
 const chipsEl = document.getElementById("chips");
 const timerTimeEl = document.getElementById("timer-time");
@@ -57,8 +60,6 @@ const btnPause = document.getElementById("btn-pause");
 const btnDone = document.getElementById("btn-done");
 const sessionsEl = document.getElementById("sessions");
 const filtersEl = document.getElementById("filters");
-
-
 // Timer
 function formatTime(seconds) {
     const minutes = Math.floor(seconds / 60);
@@ -80,12 +81,18 @@ function startTicking() {
         if (remainingSeconds <= 0) {
             clearInterval(timerIntervalId);
             timerIntervalId = null;
-            if (activeSession !== null) {
-                await apiUpdateSession(activeSession.id, "completed");
+            if (isBreak) {
+                playBeep();
+                resetTimerUI();
             }
-            playBeep();
-            resetTimerUI();
-            await reloadHistory();
+            else {
+                if (activeSession !== null) {
+                    await apiUpdateSession(activeSession.id, "completed");
+                }
+                playBeep();
+                await reloadHistory();
+                startBreak();
+            }
         }
     }, 1000);
 }
@@ -104,18 +111,40 @@ function playBeep() {
     }
     catch (_) { }
 }
+function startBreak() {
+    isBreak = true;
+    activeSession = null;
+    const breakMins = Number(breakDurationSel.value);
+    totalSeconds = breakMins * 60;
+    remainingSeconds = totalSeconds;
+    ringEl.style.strokeDasharray = String(RING_CIRCUMFERENCE);
+    ringEl.style.strokeDashoffset = "0";
+    ringEl.classList.remove("paused");
+    ringEl.classList.add("break");
+    timerTimeEl.textContent = formatTime(remainingSeconds);
+    timerModeEl.textContent = "Break";
+    timerModeEl.classList.add("break-mode");
+    btnPause.hidden = true;
+    btnDone.hidden = false;
+    btnDone.textContent = "Skip Break";
+    startTicking();
+}
 function resetTimerUI() {
     if (timerIntervalId !== null) {
         clearInterval(timerIntervalId);
         timerIntervalId = null;
     }
     activeSession = null;
+    isBreak = false;
     remainingSeconds = 0;
     totalSeconds = 0;
     pendingTags = [];
     timerTimeEl.textContent = formatTime(Number(durationSel.value) * 60);
+    timerModeEl.textContent = "";
+    timerModeEl.classList.remove("break-mode");
     ringEl.style.strokeDashoffset = "0";
     ringEl.classList.remove("paused");
+    ringEl.classList.remove("break");
     taskInput.value = "";
     taskInput.disabled = false;
     durationSel.disabled = false;
@@ -125,9 +154,8 @@ function resetTimerUI() {
     btnPause.hidden = true;
     btnDone.hidden = true;
     btnPause.textContent = "Pause";
+    btnDone.textContent = "Done";
 }
-
-
 // Tag chip UI
 function renderChips() {
     chipsEl.innerHTML = "";
@@ -191,7 +219,7 @@ btnStart.addEventListener("click", async () => {
     }
     catch (error) {
         console.error(error);
-        alert("Could not start session, is the server running?");
+        alert("Could not start session — is the server running?");
     }
     finally {
         btnStart.disabled = false;
@@ -218,12 +246,16 @@ btnPause.addEventListener("click", async () => {
     await reloadHistory();
 });
 btnDone.addEventListener("click", async () => {
-    if (activeSession === null)
-        return;
     if (timerIntervalId !== null) {
         clearInterval(timerIntervalId);
         timerIntervalId = null;
     }
+    if (isBreak) {
+        resetTimerUI();
+        return;
+    }
+    if (activeSession === null)
+        return;
     await apiUpdateSession(activeSession.id, "completed");
     resetTimerUI();
     await reloadHistory();
@@ -233,8 +265,6 @@ durationSel.addEventListener("change", () => {
         timerTimeEl.textContent = formatTime(Number(durationSel.value) * 60);
     }
 });
-
-
 // Session history
 function escapeHtml(text) {
     return text
@@ -316,10 +346,40 @@ async function reloadHistory() {
     renderSessions(sessions);
     renderFilters(tags);
 }
-
-
+// Timer restoration on page load
+async function restoreTimerIfNeeded(sessions) {
+    const inProgress = sessions.find(s => s.status === "in_progress");
+    if (!inProgress)
+        return;
+    const startedAt = new Date(inProgress.started_at).getTime();
+    const totalMs = inProgress.duration_minutes * 60 * 1000;
+    const remaining = Math.round((startedAt + totalMs - Date.now()) / 1000);
+    if (remaining <= 0) {
+        // Session finished while the page was closed — mark it completed
+        await apiUpdateSession(inProgress.id, "completed");
+        return;
+    }
+    activeSession = inProgress;
+    totalSeconds = inProgress.duration_minutes * 60;
+    remainingSeconds = remaining;
+    ringEl.style.strokeDasharray = String(RING_CIRCUMFERENCE);
+    updateRing(remainingSeconds, totalSeconds);
+    timerTimeEl.textContent = formatTime(remainingSeconds);
+    taskInput.value = inProgress.task_label;
+    taskInput.disabled = true;
+    durationSel.disabled = true;
+    tagInput.disabled = true;
+    btnStart.hidden = true;
+    btnPause.hidden = false;
+    btnDone.hidden = false;
+    startTicking();
+}
 // Startup
 ringEl.style.strokeDasharray = String(RING_CIRCUMFERENCE);
 ringEl.style.strokeDashoffset = "0";
 timerTimeEl.textContent = formatTime(Number(durationSel.value) * 60);
-reloadHistory();
+(async () => {
+    const sessions = await apiListSessions();
+    await restoreTimerIfNeeded(sessions);
+    await reloadHistory();
+})();

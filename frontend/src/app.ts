@@ -62,6 +62,7 @@ let activeSession: Session | null = null;
 let timerIntervalId: number | null = null;
 let remainingSeconds = 0;
 let totalSeconds = 0;
+let isBreak = false;
 let pendingTags: string[] = [];    // tags typed into the tag input, not yet saved
 let activeTagFilter = "";          // the tag filter currently selected in history
 
@@ -70,17 +71,19 @@ const RING_CIRCUMFERENCE = 2 * Math.PI * 80;
 
 // DOM elements
 
-const taskInput   = document.getElementById("task-input")    as HTMLInputElement;
-const durationSel = document.getElementById("duration")      as HTMLSelectElement;
-const tagInput    = document.getElementById("tag-input")     as HTMLInputElement;
-const chipsEl     = document.getElementById("chips")         as HTMLDivElement;
-const timerTimeEl = document.getElementById("timer-time")    as HTMLSpanElement;
-const ringEl      = document.getElementById("ring-progress") as HTMLElement;
-const btnStart    = document.getElementById("btn-start")     as HTMLButtonElement;
-const btnPause    = document.getElementById("btn-pause")     as HTMLButtonElement;
-const btnDone     = document.getElementById("btn-done")      as HTMLButtonElement;
-const sessionsEl  = document.getElementById("sessions")      as HTMLDivElement;
-const filtersEl   = document.getElementById("filters")       as HTMLDivElement;
+const taskInput        = document.getElementById("task-input")      as HTMLInputElement;
+const durationSel      = document.getElementById("duration")        as HTMLSelectElement;
+const breakDurationSel = document.getElementById("break-duration")  as HTMLSelectElement;
+const timerModeEl      = document.getElementById("timer-mode")      as HTMLSpanElement;
+const tagInput         = document.getElementById("tag-input")       as HTMLInputElement;
+const chipsEl          = document.getElementById("chips")           as HTMLDivElement;
+const timerTimeEl      = document.getElementById("timer-time")      as HTMLSpanElement;
+const ringEl           = document.getElementById("ring-progress")   as HTMLElement;
+const btnStart         = document.getElementById("btn-start")       as HTMLButtonElement;
+const btnPause         = document.getElementById("btn-pause")       as HTMLButtonElement;
+const btnDone          = document.getElementById("btn-done")        as HTMLButtonElement;
+const sessionsEl       = document.getElementById("sessions")        as HTMLDivElement;
+const filtersEl        = document.getElementById("filters")         as HTMLDivElement;
 
 // Timer
 
@@ -107,12 +110,17 @@ function startTicking(): void {
         if (remainingSeconds <= 0) {
             clearInterval(timerIntervalId!);
             timerIntervalId = null;
-            if (activeSession !== null) {
-                await apiUpdateSession(activeSession.id, "completed");
+            if (isBreak) {
+                playBeep();
+                resetTimerUI();
+            } else {
+                if (activeSession !== null) {
+                    await apiUpdateSession(activeSession.id, "completed");
+                }
+                playBeep();
+                await reloadHistory();
+                startBreak();
             }
-            playBeep();
-            resetTimerUI();
-            await reloadHistory();
         }
     }, 1000);
 }
@@ -132,19 +140,46 @@ function playBeep(): void {
     } catch (_) {}
 }
 
+function startBreak(): void {
+    isBreak = true;
+    activeSession = null;
+    const breakMins = Number(breakDurationSel.value);
+    totalSeconds = breakMins * 60;
+    remainingSeconds = totalSeconds;
+
+    ringEl.style.strokeDasharray = String(RING_CIRCUMFERENCE);
+    ringEl.style.strokeDashoffset = "0";
+    ringEl.classList.remove("paused");
+    ringEl.classList.add("break");
+
+    timerTimeEl.textContent = formatTime(remainingSeconds);
+    timerModeEl.textContent = "Break";
+    timerModeEl.classList.add("break-mode");
+
+    btnPause.hidden = true;
+    btnDone.hidden = false;
+    btnDone.textContent = "Skip Break";
+
+    startTicking();
+}
+
 function resetTimerUI(): void {
     if (timerIntervalId !== null) {
         clearInterval(timerIntervalId);
         timerIntervalId = null;
     }
     activeSession = null;
+    isBreak = false;
     remainingSeconds = 0;
     totalSeconds = 0;
     pendingTags = [];
 
     timerTimeEl.textContent = formatTime(Number(durationSel.value) * 60);
+    timerModeEl.textContent = "";
+    timerModeEl.classList.remove("break-mode");
     ringEl.style.strokeDashoffset = "0";
     ringEl.classList.remove("paused");
+    ringEl.classList.remove("break");
 
     taskInput.value = "";
     taskInput.disabled = false;
@@ -156,7 +191,9 @@ function resetTimerUI(): void {
     btnPause.hidden = true;
     btnDone.hidden = true;
     btnPause.textContent = "Pause";
+    btnDone.textContent = "Done";
 }
+
 
 // Tag chip UI
 
@@ -261,12 +298,15 @@ btnPause.addEventListener("click", async () => {
 });
 
 btnDone.addEventListener("click", async () => {
-    if (activeSession === null) return;
-
     if (timerIntervalId !== null) {
         clearInterval(timerIntervalId);
         timerIntervalId = null;
     }
+    if (isBreak) {
+        resetTimerUI();
+        return;
+    }
+    if (activeSession === null) return;
     await apiUpdateSession(activeSession.id, "completed");
     resetTimerUI();
     await reloadHistory();
@@ -277,6 +317,7 @@ durationSel.addEventListener("change", () => {
         timerTimeEl.textContent = formatTime(Number(durationSel.value) * 60);
     }
 });
+
 
 // Session history
 
@@ -374,10 +415,51 @@ async function reloadHistory(): Promise<void> {
     renderFilters(tags);
 }
 
+
+// Timer restoration on page load
+
+async function restoreTimerIfNeeded(sessions: Session[]): Promise<void> {
+    const inProgress = sessions.find(s => s.status === "in_progress");
+    if (!inProgress) return;
+
+    const startedAt = new Date(inProgress.started_at).getTime();
+    const totalMs = inProgress.duration_minutes * 60 * 1000;
+    const remaining = Math.round((startedAt + totalMs - Date.now()) / 1000);
+
+    if (remaining <= 0) {
+        // Session finished while the page was closed — mark it completed
+        await apiUpdateSession(inProgress.id, "completed");
+        return;
+    }
+
+    activeSession = inProgress;
+    totalSeconds = inProgress.duration_minutes * 60;
+    remainingSeconds = remaining;
+
+    ringEl.style.strokeDasharray = String(RING_CIRCUMFERENCE);
+    updateRing(remainingSeconds, totalSeconds);
+    timerTimeEl.textContent = formatTime(remainingSeconds);
+
+    taskInput.value = inProgress.task_label;
+    taskInput.disabled = true;
+    durationSel.disabled = true;
+    tagInput.disabled = true;
+
+    btnStart.hidden = true;
+    btnPause.hidden = false;
+    btnDone.hidden = false;
+
+    startTicking();
+}
+
 // Startup
 
 ringEl.style.strokeDasharray = String(RING_CIRCUMFERENCE);
 ringEl.style.strokeDashoffset = "0";
 timerTimeEl.textContent = formatTime(Number(durationSel.value) * 60);
 
-reloadHistory();
+(async () => {
+    const sessions = await apiListSessions();
+    await restoreTimerIfNeeded(sessions);
+    await reloadHistory();
+})();
