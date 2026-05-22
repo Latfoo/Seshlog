@@ -111,6 +111,17 @@ main {
 }
 
 .ring-progress.paused { stroke: var(--amber); }
+.ring-progress.break  { stroke: var(--green); }
+
+.timer-mode {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--muted);
+  min-height: 1em;
+}
+.timer-mode.break-mode { color: var(--green); }
 
 .timer-time {
   position: absolute;
