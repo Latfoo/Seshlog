@@ -32,19 +32,21 @@ git clone <repo-url>
 cd pomodoro-app
 python -m venv venv
 source venv/bin/activate
-pip install fastapi sqlmodel psycopg2-binary python-dotenv uvicorn
+pip install -r requirements.txt
 ```
 
 **2. Configure the database**
 
-Create a `.env` file:
+Create a `.env` file in the project root:
 ```
-DATABASE_URL=postgresql://user:password@localhost:5432/pomodoro
+DB_USER=your_user
+DB_PASSWORD=your_password
+DB_NAME=pomodoro
 ```
 
 **3. Start the server**
 ```bash
-uvicorn main:app --reload
+uvicorn app.main:app --reload
 ```
 
 The API runs at `http://localhost:8000` and the interactive docs are at `http://localhost:8000/docs`.
