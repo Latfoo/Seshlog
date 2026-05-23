@@ -7,12 +7,14 @@ from app.models.tag import TagRead, _clean_tags
 
 
 class SessionStatus(str, Enum):
+    """The three states a session can be in."""
     in_progress = "in_progress"
     completed = "completed"
     paused = "paused"
 
 
 class PomodoroSessionCreate(BaseModel):
+    """Data required to start a new session. Sent by the client in a POST request."""
     task_label: str = Field(min_length=1, max_length=200)
     duration_minutes: int = Field(ge=1, le=480)
     tags: List[str] = Field(default=[], max_length=20)
@@ -32,6 +34,7 @@ class PomodoroSessionCreate(BaseModel):
 
 
 class PomodoroSessionUpdate(BaseModel):
+    """Fields that can be changed on an existing session. All fields are optional."""
     task_label: Optional[str] = Field(default=None, min_length=1, max_length=200)
     duration_minutes: Optional[int] = Field(default=None, ge=1, le=480)
     status: Optional[SessionStatus] = None
@@ -56,6 +59,7 @@ class PomodoroSessionUpdate(BaseModel):
 
 
 class PomodoroSessionRead(BaseModel):
+    """Shape of a session as returned by the API. Includes tags as objects, not just names."""
     model_config = {"from_attributes": True}
 
     id: int

@@ -9,6 +9,8 @@ logger = logging.getLogger(__name__)
 
 
 class SessionService:
+    """Handles all database operations for pomodoro sessions."""
+
     def __init__(self, db: Session):
         self.db = db
 
@@ -27,6 +29,7 @@ class SessionService:
         return tags
 
     def create(self, data: PomodoroSessionCreate) -> PomodoroSession:
+        """Create a new session, creating any new tags along the way."""
         tags = self._get_or_create_tags(data.tags)
         new_session = PomodoroSession(
             task_label=data.task_label,
@@ -40,6 +43,7 @@ class SessionService:
         return new_session
 
     def list(self, tag: str | None = None) -> list[PomodoroSession]:
+        """Return all sessions, or only those with a specific tag if one is given."""
         query = select(PomodoroSession)
         if tag is not None:
             # join through the link table to filter by tag name
@@ -50,6 +54,7 @@ class SessionService:
         return sessions
 
     def get(self, session_id: int) -> PomodoroSession:
+        """Fetch a single session by ID. Raises 404 if it does not exist."""
         session = self.db.get(PomodoroSession, session_id)
         if not session:
             logger.warning("Session %d not found", session_id)
@@ -58,6 +63,7 @@ class SessionService:
         return session
 
     def update(self, session_id: int, data: PomodoroSessionUpdate) -> PomodoroSession:
+        """Apply partial updates to a session. Raises 404 if it does not exist."""
         session = self.db.get(PomodoroSession, session_id)
         if not session:
             logger.warning("Session %d not found", session_id)
@@ -79,6 +85,7 @@ class SessionService:
         return session
 
     def delete(self, session_id: int) -> None:
+        """Delete a session and its tag links. Raises 404 if it does not exist."""
         session = self.db.get(PomodoroSession, session_id)
         if not session:
             logger.warning("Session %d not found", session_id)

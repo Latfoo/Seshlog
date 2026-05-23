@@ -11,17 +11,20 @@ engine = create_engine(config.database_url, echo=True)
 
 # This is the link table that connects sessions and tags (many-to-many)
 class SessionTagLink(SQLModel, table=True):
+    """Join table that links sessions to tags (many-to-many). Not used directly in code."""
     session_id: Optional[int] = Field(default=None, foreign_key="pomodorosession.id", primary_key=True)
     tag_id: Optional[int] = Field(default=None, foreign_key="tag.id", primary_key=True)
 
 
 class Tag(SQLModel, table=True):
+    """A label that can be attached to multiple sessions."""
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(unique=True, index=True)
     sessions: List["PomodoroSession"] = Relationship(back_populates="tags", link_model=SessionTagLink)
 
 
 class PomodoroSession(SQLModel, table=True):
+    """A single pomodoro work session stored in the database."""
     id: Optional[int] = Field(default=None, primary_key=True)
     task_label: str
     duration_minutes: int
