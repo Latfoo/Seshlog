@@ -90,6 +90,40 @@ curl -X PATCH http://localhost:8000/sessions/1 \
   -d '{"status": "completed"}'
 ```
 
+## Project structure
+
+```
+pomodoro-app/
+├── app/
+│   ├── api/
+│   │   ├── frontend.py       # serves the demo UI
+│   │   ├── health.py         # health check endpoint
+│   │   ├── sessions.py       # session CRUD endpoints
+│   │   └── tags.py           # tags endpoint
+│   ├── core/
+│   │   ├── config.py         # environment/settings
+│   │   └── logging.py        # logging setup
+│   ├── db/
+│   │   └── schema.py         # database table definitions
+│   ├── models/
+│   │   ├── session.py        # session request/response models
+│   │   └── tag.py            # tag request/response models
+│   ├── services/
+│   │   ├── session_service.py  # session business logic
+│   │   └── tag_service.py      # tag business logic
+│   └── main.py               # app entry point
+├── frontend/
+│   └── src/
+│       └── app.ts            # TypeScript source for the demo UI
+├── static/
+│   ├── index.html            # demo UI HTML
+│   ├── app.js                # compiled frontend JS
+│   └── styles.css            # demo UI styles
+├── .env                      # local environment variables (not committed)
+├── requirements.txt
+└── README.md
+```
+
 ## Data model
 
 Three tables with a many-to-many relationship between sessions and tags:
