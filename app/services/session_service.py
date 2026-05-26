@@ -1,9 +1,10 @@
 import logging
+from datetime import datetime
 from fastapi import HTTPException
 from sqlmodel import Session, select
 
 from app.db.schema import SessionTagLink, Tag, PomodoroSession
-from app.models.session import PomodoroSessionCreate, PomodoroSessionUpdate
+from app.models.session import PomodoroSessionCreate, PomodoroSessionUpdate, SessionStatus
 
 logger = logging.getLogger(__name__)
 
@@ -72,11 +73,29 @@ class SessionService:
     def update(self, session_id: int, data: PomodoroSessionUpdate, user_id: int) -> PomodoroSession:
         """Apply partial updates to a session. Raises 404 if it does not exist or belong to the user."""
         session = self._get_owned_session(session_id, user_id)
+        now = datetime.now()
 
-        if data.duration_minutes is not None:
-            session.duration_minutes = data.duration_minutes
         if data.status is not None:
+            if data.status == SessionStatus.paused and session.status == SessionStatus.in_progress:
+                # Record when the pause started
+                session.paused_at = now
+
+            elif data.status == SessionStatus.in_progress and session.status == SessionStatus.paused:
+                # Accumulate the time spent in this pause, then clear paused_at
+                if session.paused_at:
+                    session.total_paused_seconds += int((now - session.paused_at).total_seconds())
+                    session.paused_at = None
+
+            elif data.status == SessionStatus.completed:
+                # Accumulate any current pause, then compute actual elapsed work time
+                if session.paused_at:
+                    session.total_paused_seconds += int((now - session.paused_at).total_seconds())
+                    session.paused_at = None
+                elapsed_seconds = int((now - session.started_at).total_seconds()) - session.total_paused_seconds
+                session.duration_minutes = max(1, round(elapsed_seconds / 60))
+
             session.status = data.status
+
         if data.tags is not None:
             session.tags = self._get_or_create_tags(data.tags)
 
