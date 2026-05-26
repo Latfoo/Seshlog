@@ -6,4 +6,4 @@ router = APIRouter(tags=["frontend"])
 
 @router.get("/")
 def root():
-    return FileResponse("static/index.html")
+    return FileResponse("frontend/static/index.html")

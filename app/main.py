@@ -27,7 +27,7 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/static", StaticFiles(directory="frontend/static"), name="static")
 app.include_router(sessions.router)
 app.include_router(tags.router)
 app.include_router(health.router)
