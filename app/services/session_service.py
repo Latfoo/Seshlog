@@ -25,6 +25,7 @@ class SessionService:
                 new_tag = Tag(name=name)
                 self.db.add(new_tag)
                 self.db.flush()  # write to DB so the new tag gets an ID before we continue
+                logger.info("Created new tag: '%s'", name)
                 tags.append(new_tag)
         return tags
 
@@ -41,6 +42,7 @@ class SessionService:
         self.db.commit()
         self.db.refresh(new_session)
         _ = new_session.tags  # load tags into memory before session closes
+        logger.info("Session %d created for user %d (label=%r)", new_session.id, user_id, data.task_label)
         return new_session
 
     def list(self, tag: str | None = None, user_id: int = 0) -> list[PomodoroSession]:
@@ -85,6 +87,7 @@ class SessionService:
         self.db.commit()
         self.db.refresh(session)
         _ = session.tags  # load tags into memory before session closes
+        logger.info("Session %d updated by user %d", session_id, user_id)
         return session
 
     def delete(self, session_id: int, user_id: int) -> None:
@@ -96,3 +99,4 @@ class SessionService:
             self.db.delete(link)
         self.db.delete(session)
         self.db.commit()
+        logger.info("Session %d deleted by user %d", session_id, user_id)

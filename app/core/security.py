@@ -1,8 +1,11 @@
-from jose import jwt
+from jose import jwt, JWTError, ExpiredSignatureError
 from datetime import datetime, timedelta, timezone
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
+import logging
 import os
+
+logger = logging.getLogger(__name__)
 
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = "HS256"
@@ -24,5 +27,9 @@ def decode_token(token: str) -> int:
 def get_current_user(token: str = Depends(oauth2_scheme)) -> int:
     try:
         return decode_token(token)
-    except Exception:
+    except ExpiredSignatureError:
+        logger.warning("Token rejected: expired")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+    except JWTError as e:
+        logger.warning("Token rejected: %s", e)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
