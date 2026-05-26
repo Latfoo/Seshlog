@@ -26,7 +26,6 @@ class PomodoroSessionCreate(BaseModel):
 
 class PomodoroSessionUpdate(BaseModel):
     """Fields that can be changed on an existing session. All fields are optional."""
-    duration_minutes: Optional[int] = Field(default=None, ge=1, le=480)
     status: Optional[SessionStatus] = None
     tags: Optional[List[str]] = Field(default=None, max_length=20)
 
@@ -46,4 +45,6 @@ class PomodoroSessionRead(BaseModel):
     duration_minutes: int
     started_at: datetime
     status: SessionStatus
+    paused_at: Optional[datetime] = None
+    total_paused_seconds: int = 0
     tags: List[TagRead] = []

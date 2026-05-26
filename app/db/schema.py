@@ -30,6 +30,8 @@ class PomodoroSession(SQLModel, table=True):
     duration_minutes: int
     started_at: datetime = Field(default_factory=datetime.now)
     status: SessionStatus = Field(default=SessionStatus.in_progress)
+    paused_at: Optional[datetime] = Field(default=None, nullable=True)
+    total_paused_seconds: int = Field(default=0)
     tags: List[Tag] = Relationship(back_populates="sessions", link_model=SessionTagLink)
 
 

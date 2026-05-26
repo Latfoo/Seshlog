@@ -81,7 +81,7 @@ async function apiListSessions(filterTag) {
     return fetchJson(url);
 }
 async function apiUpdateSession(id, status) {
-    return fetchJson(`/sessions/${id}`, "PATCH", { status: status });
+    return fetchJson(`/sessions/${id}`, "PATCH", { status });
 }
 async function apiDeleteSession(id) {
     await fetchJson(`/sessions/${id}`, "DELETE");
@@ -122,6 +122,50 @@ const headerUser = document.getElementById("header-user");
 const headerUname = document.getElementById("header-username");
 const btnLogout = document.getElementById("btn-logout");
 // Timer
+function computeRemainingSeconds(session) {
+    const startedMs = new Date(session.started_at).getTime();
+    const nowMs = Date.now();
+    const pausedMs = session.total_paused_seconds * 1000;
+    const currentPauseMs = session.paused_at
+        ? nowMs - new Date(session.paused_at).getTime()
+        : 0;
+    const activeElapsedMs = nowMs - startedMs - pausedMs - currentPauseMs;
+    const targetMs = session.duration_minutes * 60 * 1000;
+    return Math.max(0, Math.round((targetMs - activeElapsedMs) / 1000));
+}
+async function restoreActiveSession() {
+    const sessions = await apiListSessions();
+    const active = sessions.find(s => s.status === "in_progress" || s.status === "paused");
+    if (!active)
+        return;
+    const remaining = computeRemainingSeconds(active);
+    if (remaining <= 0) {
+        // Timer expired while the page was closed — mark it complete on the server
+        await apiUpdateSession(active.id, "completed");
+        await reloadHistory();
+        return;
+    }
+    activeSession = active;
+    totalSeconds = active.duration_minutes * 60;
+    remainingSeconds = remaining;
+    ringEl.style.strokeDasharray = String(RING_CIRCUMFERENCE);
+    updateRing(remainingSeconds, totalSeconds);
+    timerTimeEl.textContent = formatTime(remainingSeconds);
+    durationSel.disabled = true;
+    tagInput.disabled = true;
+    btnStart.hidden = true;
+    btnPause.hidden = false;
+    btnDone.hidden = false;
+    if (active.status === "in_progress") {
+        ringEl.classList.remove("paused");
+        btnPause.textContent = "Pause";
+        startTicking();
+    }
+    else {
+        ringEl.classList.add("paused");
+        btnPause.textContent = "Resume";
+    }
+}
 function formatTime(seconds) {
     const minutes = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -433,6 +477,7 @@ timerTimeEl.textContent = formatTime(Number(durationSel.value) * 60);
     hideAuthModal(getSavedUsername());
     try {
         await reloadHistory();
+        await restoreActiveSession();
     }
     catch {
         // 401 is already handled inside fetchJson
