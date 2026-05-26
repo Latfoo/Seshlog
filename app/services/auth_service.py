@@ -19,6 +19,7 @@ class UserService():
 
         existing_user = self.db.exec(select(UserTable).where(UserTable.email == new_user.email)).first()
         if existing_user:
+            logger.warning("Registration failed: email already in use (%s)", new_user.email)
             raise HTTPException(status_code=400, detail="A user with this email already exists.")
 
         s = bcrypt.gensalt()
@@ -37,11 +38,13 @@ class UserService():
 
         existing_user = self.db.exec(select(UserTable).where(UserTable.email == user.email)).first()
         if not existing_user:
+            logger.warning("Login failed: no account for email (%s)", user.email)
             raise HTTPException(status_code=401, detail="Invalid email or password.")
 
         if bcrypt.checkpw(user.password.encode('utf-8'), existing_user.hashed_password.encode('utf-8')):
             token = create_token(existing_user.id)
-            logger.info(f"User logged in: {user.email}")
+            logger.info("User logged in: %s", user.email)
             return {"access_token": token, "token_type": "bearer"}
 
+        logger.warning("Login failed: wrong password for user %s", user.email)
         raise HTTPException(status_code=401, detail="Invalid email or password.")
