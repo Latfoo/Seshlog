@@ -26,8 +26,17 @@ class Tag(SQLModel, table=True):
 class PomodoroSession(SQLModel, table=True):
     """A single pomodoro work session stored in the database."""
     id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="usertable.id", index= True)
     task_label: str
     duration_minutes: int
     started_at: datetime = Field(default_factory=datetime.now)
     status: SessionStatus = Field(default=SessionStatus.in_progress)
     tags: List[Tag] = Relationship(back_populates="sessions", link_model=SessionTagLink)
+
+
+class UserTable(SQLModel, table=True):
+    """A table to store user credentials."""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    email: str = Field(unique=True, index=True)
+    hashed_password: str
+    

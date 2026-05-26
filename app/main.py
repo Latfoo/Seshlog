@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from app.core.config import config
 from app.core.logging import setup_logging
 from app.db.schema import engine
-from app.api import sessions, tags, health, frontend
+from app.api import sessions, tags, health, frontend, auth
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -32,3 +32,4 @@ app.include_router(sessions.router)
 app.include_router(tags.router)
 app.include_router(health.router)
 app.include_router(frontend.router)
+app.include_router(auth.router)
