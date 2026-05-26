@@ -27,7 +27,6 @@ class PomodoroSession(SQLModel, table=True):
     """A single pomodoro work session stored in the database."""
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="usertable.id", index= True)
-    task_label: str
     duration_minutes: int
     started_at: datetime = Field(default_factory=datetime.now)
     status: SessionStatus = Field(default=SessionStatus.in_progress)

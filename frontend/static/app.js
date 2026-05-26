@@ -70,9 +70,8 @@ async function apiRegister(email, password) {
     const data = await response.json();
     return data.access_token;
 }
-async function apiCreateSession(taskLabel, durationMinutes, tags) {
+async function apiCreateSession(durationMinutes, tags) {
     return fetchJson("/sessions", "POST", {
-        task_label: taskLabel,
         duration_minutes: durationMinutes,
         tags: tags,
     });
@@ -100,7 +99,6 @@ let activeTagFilter = ""; // the tag filter currently selected in history
 // Circumference of the SVG ring (radius = 80)
 const RING_CIRCUMFERENCE = 2 * Math.PI * 80;
 // DOM elements
-const taskInput = document.getElementById("task-input");
 const durationSel = document.getElementById("duration");
 const tagInput = document.getElementById("tag-input");
 const chipsEl = document.getElementById("chips");
@@ -180,8 +178,6 @@ function resetTimerUI() {
     timerTimeEl.textContent = formatTime(Number(durationSel.value) * 60);
     ringEl.style.strokeDashoffset = "0";
     ringEl.classList.remove("paused");
-    taskInput.value = "";
-    taskInput.disabled = false;
     durationSel.disabled = false;
     tagInput.disabled = false;
     chipsEl.innerHTML = "";
@@ -284,10 +280,9 @@ btnLogout.addEventListener("click", () => {
 });
 // Timer buttons
 btnStart.addEventListener("click", async () => {
-    const label = taskInput.value.trim() || "Pomodoro Session";
     btnStart.disabled = true;
     try {
-        activeSession = await apiCreateSession(label, Number(durationSel.value), pendingTags);
+        activeSession = await apiCreateSession(Number(durationSel.value), pendingTags);
         totalSeconds = activeSession.duration_minutes * 60;
         remainingSeconds = totalSeconds;
         ringEl.style.strokeDasharray = String(RING_CIRCUMFERENCE);
@@ -295,7 +290,6 @@ btnStart.addEventListener("click", async () => {
         ringEl.classList.remove("paused");
         timerTimeEl.textContent = formatTime(remainingSeconds);
         startTicking();
-        taskInput.disabled = true;
         durationSel.disabled = true;
         tagInput.disabled = true;
         btnStart.hidden = true;
@@ -383,7 +377,6 @@ function renderSessions(sessions) {
             .join("");
         card.innerHTML = `
             <div class="sinfo">
-                <span class="slabel">${escapeHtml(session.task_label)}</span>
                 <div class="smeta">
                     <span class="sbadge s-${session.status}">${STATUS_LABELS[session.status] ?? session.status}</span>
                     <span class="sdur">${session.duration_minutes} min</span>

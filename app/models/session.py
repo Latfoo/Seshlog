@@ -15,17 +15,8 @@ class SessionStatus(str, Enum):
 
 class PomodoroSessionCreate(BaseModel):
     """Data required to start a new session. Sent by the client in a POST request."""
-    task_label: str = Field(min_length=1, max_length=200)
     duration_minutes: int = Field(ge=1, le=480)
     tags: List[str] = Field(default=[], max_length=20)
-
-    @field_validator("task_label")
-    @classmethod
-    def strip_task_label(cls, v: str) -> str:
-        v = v.strip()
-        if not v:
-            raise ValueError("Task label cannot be blank")
-        return v
 
     @field_validator("tags")
     @classmethod
@@ -35,20 +26,9 @@ class PomodoroSessionCreate(BaseModel):
 
 class PomodoroSessionUpdate(BaseModel):
     """Fields that can be changed on an existing session. All fields are optional."""
-    task_label: Optional[str] = Field(default=None, min_length=1, max_length=200)
     duration_minutes: Optional[int] = Field(default=None, ge=1, le=480)
     status: Optional[SessionStatus] = None
     tags: Optional[List[str]] = Field(default=None, max_length=20)
-
-    @field_validator("task_label")
-    @classmethod
-    def strip_task_label(cls, v: Optional[str]) -> Optional[str]:
-        if v is None:
-            return v
-        v = v.strip()
-        if not v:
-            raise ValueError("Task label cannot be blank")
-        return v
 
     @field_validator("tags")
     @classmethod
@@ -63,7 +43,6 @@ class PomodoroSessionRead(BaseModel):
     model_config = {"from_attributes": True}
 
     id: int
-    task_label: str
     duration_minutes: int
     started_at: datetime
     status: SessionStatus

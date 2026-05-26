@@ -34,7 +34,6 @@ class SessionService:
         tags = self._get_or_create_tags(data.tags)
         new_session = PomodoroSession(
             user_id=user_id,
-            task_label=data.task_label,
             duration_minutes=data.duration_minutes,
             tags=tags,
         )
@@ -42,7 +41,7 @@ class SessionService:
         self.db.commit()
         self.db.refresh(new_session)
         _ = new_session.tags  # load tags into memory before session closes
-        logger.info("Session %d created for user %d (label=%r)", new_session.id, user_id, data.task_label)
+        logger.info("Session %d created for user %d", new_session.id, user_id)
         return new_session
 
     def list(self, tag: str | None = None, user_id: int = 0) -> list[PomodoroSession]:
@@ -74,8 +73,6 @@ class SessionService:
         """Apply partial updates to a session. Raises 404 if it does not exist or belong to the user."""
         session = self._get_owned_session(session_id, user_id)
 
-        if data.task_label is not None:
-            session.task_label = data.task_label
         if data.duration_minutes is not None:
             session.duration_minutes = data.duration_minutes
         if data.status is not None:
