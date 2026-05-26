@@ -15,7 +15,7 @@ interface Session {
 }
 
 // Token storage
-// The JWT returned by the backend is kept in localStorage so it survives page refreshes.
+// The JWT is kept in localStorage so it survives page refreshes.
 // The username is stored separately because decoding the JWT would need a library.
 
 function getToken(): string | null {
@@ -49,7 +49,7 @@ async function fetchJson(url: string, method = "GET", body?: object): Promise<an
 
     const response = await fetch(url, options);
 
-    // 401 means the token is missing or expired — send the user back to the login screen.
+    // 401 means the token is expired — send the user back to the login screen.
     if (response.status === 401) {
         clearToken();
         showAuthModal();
@@ -64,25 +64,25 @@ async function fetchJson(url: string, method = "GET", body?: object): Promise<an
 // Auth API calls use plain fetch (not fetchJson) so a wrong password doesn't
 // trigger the "session expired" redirect that fetchJson does on 401.
 
-async function apiLogin(username: string, password: string): Promise<string> {
+async function apiLogin(email: string, password: string): Promise<string> {
     const response = await fetch("/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ email, password }),
     });
     if (!response.ok) {
         const data = await response.json().catch(() => ({}));
-        throw new Error(data.detail ?? "Login failed — check your username and password");
+        throw new Error(data.detail ?? "Login failed — check your email and password");
     }
     const data = await response.json();
     return data.access_token;
 }
 
-async function apiRegister(username: string, password: string): Promise<string> {
+async function apiRegister(email: string, password: string): Promise<string> {
     const response = await fetch("/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ email, password }),
     });
     if (!response.ok) {
         const data = await response.json().catch(() => ({}));
@@ -122,7 +122,6 @@ let activeSession: Session | null = null;
 let timerIntervalId: number | null = null;
 let remainingSeconds = 0;
 let totalSeconds = 0;
-let isBreak = false;
 let pendingTags: string[] = [];  // tags typed into the tag input, not yet saved
 let activeTagFilter = "";        // the tag filter currently selected in history
 
@@ -130,32 +129,30 @@ let activeTagFilter = "";        // the tag filter currently selected in history
 const RING_CIRCUMFERENCE = 2 * Math.PI * 80;
 
 // DOM elements
-const taskInput      = document.getElementById("task-input")     as HTMLInputElement;
-const durationSel    = document.getElementById("duration")        as HTMLSelectElement;
-const breakDurationSel = document.getElementById("break-duration") as HTMLSelectElement;
-const timerModeEl    = document.getElementById("timer-mode")     as HTMLSpanElement;
-const tagInput       = document.getElementById("tag-input")      as HTMLInputElement;
-const chipsEl        = document.getElementById("chips")           as HTMLDivElement;
-const timerTimeEl    = document.getElementById("timer-time")     as HTMLSpanElement;
-const ringEl         = document.getElementById("ring-progress")  as SVGCircleElement;
-const btnStart       = document.getElementById("btn-start")      as HTMLButtonElement;
-const btnPause       = document.getElementById("btn-pause")      as HTMLButtonElement;
-const btnDone        = document.getElementById("btn-done")       as HTMLButtonElement;
-const sessionsEl     = document.getElementById("sessions")       as HTMLDivElement;
-const filtersEl      = document.getElementById("filters")        as HTMLDivElement;
+const taskInput   = document.getElementById("task-input")    as HTMLInputElement;
+const durationSel = document.getElementById("duration")      as HTMLSelectElement;
+const tagInput    = document.getElementById("tag-input")     as HTMLInputElement;
+const chipsEl     = document.getElementById("chips")         as HTMLDivElement;
+const timerTimeEl = document.getElementById("timer-time")    as HTMLSpanElement;
+const ringEl      = document.getElementById("ring-progress") as unknown as SVGCircleElement;
+const btnStart    = document.getElementById("btn-start")     as HTMLButtonElement;
+const btnPause    = document.getElementById("btn-pause")     as HTMLButtonElement;
+const btnDone     = document.getElementById("btn-done")      as HTMLButtonElement;
+const sessionsEl  = document.getElementById("sessions")      as HTMLDivElement;
+const filtersEl   = document.getElementById("filters")       as HTMLDivElement;
 
 // Auth modal elements
-const authModal    = document.getElementById("auth-modal")    as HTMLDivElement;
-const authForm     = document.getElementById("auth-form")     as HTMLFormElement;
-const authUserInput = document.getElementById("auth-username") as HTMLInputElement;
-const authPassInput = document.getElementById("auth-password") as HTMLInputElement;
-const authError    = document.getElementById("auth-error")    as HTMLParagraphElement;
-const authSubmit   = document.getElementById("auth-submit")   as HTMLButtonElement;
-const tabLogin     = document.getElementById("tab-login")     as HTMLButtonElement;
-const tabRegister  = document.getElementById("tab-register")  as HTMLButtonElement;
-const headerUser   = document.getElementById("header-user")   as HTMLElement;
-const headerUname  = document.getElementById("header-username") as HTMLSpanElement;
-const btnLogout    = document.getElementById("btn-logout")    as HTMLButtonElement;
+const authModal     = document.getElementById("auth-modal")      as HTMLDivElement;
+const authForm      = document.getElementById("auth-form")       as HTMLFormElement;
+const authUserInput = document.getElementById("auth-username")   as HTMLInputElement;
+const authPassInput = document.getElementById("auth-password")   as HTMLInputElement;
+const authError     = document.getElementById("auth-error")      as HTMLParagraphElement;
+const authSubmit    = document.getElementById("auth-submit")     as HTMLButtonElement;
+const tabLogin      = document.getElementById("tab-login")       as HTMLButtonElement;
+const tabRegister   = document.getElementById("tab-register")    as HTMLButtonElement;
+const headerUser    = document.getElementById("header-user")     as HTMLElement;
+const headerUname   = document.getElementById("header-username") as HTMLSpanElement;
+const btnLogout     = document.getElementById("btn-logout")      as HTMLButtonElement;
 
 // Timer
 
@@ -181,18 +178,12 @@ function startTicking(): void {
         if (remainingSeconds <= 0) {
             clearInterval(timerIntervalId!);
             timerIntervalId = null;
-
-            if (isBreak) {
-                playBeep();
-                resetTimerUI();
-            } else {
-                if (activeSession !== null) {
-                    await apiUpdateSession(activeSession.id, "completed");
-                }
-                playBeep();
-                await reloadHistory();
-                startBreak();
+            if (activeSession !== null) {
+                await apiUpdateSession(activeSession.id, "completed");
             }
+            playBeep();
+            await reloadHistory();
+            resetTimerUI();
         }
     }, 1000);
 }
@@ -212,41 +203,18 @@ function playBeep(): void {
     } catch (_) {}
 }
 
-function startBreak(): void {
-    isBreak = true;
-    activeSession = null;
-    const breakMins = Number(breakDurationSel.value);
-    totalSeconds = breakMins * 60;
-    remainingSeconds = totalSeconds;
-    ringEl.style.strokeDasharray = String(RING_CIRCUMFERENCE);
-    ringEl.style.strokeDashoffset = "0";
-    ringEl.classList.remove("paused");
-    ringEl.classList.add("break");
-    timerTimeEl.textContent = formatTime(remainingSeconds);
-    timerModeEl.textContent = "Break";
-    timerModeEl.classList.add("break-mode");
-    btnPause.hidden = true;
-    btnDone.hidden = false;
-    btnDone.textContent = "Skip Break";
-    startTicking();
-}
-
 function resetTimerUI(): void {
     if (timerIntervalId !== null) {
         clearInterval(timerIntervalId);
         timerIntervalId = null;
     }
     activeSession = null;
-    isBreak = false;
     remainingSeconds = 0;
     totalSeconds = 0;
     pendingTags = [];
     timerTimeEl.textContent = formatTime(Number(durationSel.value) * 60);
-    timerModeEl.textContent = "";
-    timerModeEl.classList.remove("break-mode");
     ringEl.style.strokeDashoffset = "0";
     ringEl.classList.remove("paused");
-    ringEl.classList.remove("break");
     taskInput.value = "";
     taskInput.disabled = false;
     durationSel.disabled = false;
@@ -256,7 +224,6 @@ function resetTimerUI(): void {
     btnPause.hidden = true;
     btnDone.hidden = true;
     btnPause.textContent = "Pause";
-    btnDone.textContent = "Done";
 }
 
 // Tag chip UI
@@ -334,20 +301,20 @@ tabRegister.addEventListener("click", () => {
 
 authForm.addEventListener("submit", async (e) => {
     e.preventDefault();
-    const username = authUserInput.value.trim();
+    const email = authUserInput.value.trim();
     const password = authPassInput.value;
-    if (!username || !password) return;
+    if (!email || !password) return;
 
     authSubmit.disabled = true;
     authError.textContent = "";
 
     try {
         const token = authMode === "login"
-            ? await apiLogin(username, password)
-            : await apiRegister(username, password);
+            ? await apiLogin(email, password)
+            : await apiRegister(email, password);
         setToken(token);
-        saveUsername(username);
-        hideAuthModal(username);
+        saveUsername(email);
+        hideAuthModal(email);
         await reloadHistory();
     } catch (err: any) {
         authError.textContent = err.message ?? "Something went wrong";
@@ -414,10 +381,6 @@ btnDone.addEventListener("click", async () => {
         clearInterval(timerIntervalId);
         timerIntervalId = null;
     }
-    if (isBreak) {
-        resetTimerUI();
-        return;
-    }
     if (activeSession === null) return;
     await apiUpdateSession(activeSession.id, "completed");
     resetTimerUI();
@@ -482,7 +445,7 @@ function renderSessions(sessions: Session[]): void {
                 </div>
                 ${tagsHtml !== "" ? `<div class="stags">${tagsHtml}</div>` : ""}
             </div>
-            <button class="del" title="Delete session">✕</button>
+            <button class="del" title="Delete session">&#x2715;</button>
         `;
 
         card.querySelector(".del")!.addEventListener("click", async () => {
@@ -525,38 +488,6 @@ async function reloadHistory(): Promise<void> {
     renderFilters(tags);
 }
 
-// Timer restoration on page load
-
-async function restoreTimerIfNeeded(sessions: Session[]): Promise<void> {
-    const inProgress = sessions.find(s => s.status === "in_progress");
-    if (!inProgress) return;
-
-    const startedAt = new Date(inProgress.started_at).getTime();
-    const totalMs   = inProgress.duration_minutes * 60 * 1000;
-    const remaining = Math.round((startedAt + totalMs - Date.now()) / 1000);
-
-    if (remaining <= 0) {
-        // Session finished while the page was closed — mark it completed
-        await apiUpdateSession(inProgress.id, "completed");
-        return;
-    }
-
-    activeSession  = inProgress;
-    totalSeconds   = inProgress.duration_minutes * 60;
-    remainingSeconds = remaining;
-    ringEl.style.strokeDasharray = String(RING_CIRCUMFERENCE);
-    updateRing(remainingSeconds, totalSeconds);
-    timerTimeEl.textContent = formatTime(remainingSeconds);
-    taskInput.value    = inProgress.task_label;
-    taskInput.disabled = true;
-    durationSel.disabled = true;
-    tagInput.disabled  = true;
-    btnStart.hidden = true;
-    btnPause.hidden = false;
-    btnDone.hidden  = false;
-    startTicking();
-}
-
 // Startup
 
 ringEl.style.strokeDasharray  = String(RING_CIRCUMFERENCE);
@@ -568,13 +499,8 @@ timerTimeEl.textContent = formatTime(Number(durationSel.value) * 60);
         showAuthModal();
         return;
     }
-    // Token exists — hide the modal and load data.
-    // If the token is expired the first fetchJson call will return 401,
-    // which clears the token and shows the modal automatically.
     hideAuthModal(getSavedUsername());
     try {
-        const sessions = await apiListSessions();
-        await restoreTimerIfNeeded(sessions);
         await reloadHistory();
     } catch {
         // 401 is already handled inside fetchJson
