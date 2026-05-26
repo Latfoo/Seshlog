@@ -28,10 +28,11 @@ class SessionService:
                 tags.append(new_tag)
         return tags
 
-    def create(self, data: PomodoroSessionCreate) -> PomodoroSession:
+    def create(self, data: PomodoroSessionCreate, user_id: int) -> PomodoroSession:
         """Create a new session, creating any new tags along the way."""
         tags = self._get_or_create_tags(data.tags)
         new_session = PomodoroSession(
+            user_id=user_id,
             task_label=data.task_label,
             duration_minutes=data.duration_minutes,
             tags=tags,
@@ -42,9 +43,9 @@ class SessionService:
         _ = new_session.tags  # load tags into memory before session closes
         return new_session
 
-    def list(self, tag: str | None = None) -> list[PomodoroSession]:
-        """Return all sessions, or only those with a specific tag if one is given."""
-        query = select(PomodoroSession)
+    def list(self, tag: str | None = None, user_id: int = 0) -> list[PomodoroSession]:
+        """Return all sessions belonging to the user, optionally filtered by tag."""
+        query = select(PomodoroSession).where(PomodoroSession.user_id == user_id)
         if tag is not None:
             # join through the link table to filter by tag name
             query = query.join(SessionTagLink).join(Tag).where(Tag.name == tag)
@@ -53,21 +54,23 @@ class SessionService:
             _ = s.tags  # load tags into memory before session closes
         return sessions
 
-    def get(self, session_id: int) -> PomodoroSession:
-        """Fetch a single session by ID. Raises 404 if it does not exist."""
+    def _get_owned_session(self, session_id: int, user_id: int) -> PomodoroSession:
+        """Fetch a session and verify the requesting user owns it. Raises 404 either way."""
         session = self.db.get(PomodoroSession, session_id)
-        if not session:
-            logger.warning("Session %d not found", session_id)
+        if not session or session.user_id != user_id:
+            logger.warning("Session %d not found for user %d", session_id, user_id)
             raise HTTPException(status_code=404, detail="Session not found")
+        return session
+
+    def get(self, session_id: int, user_id: int) -> PomodoroSession:
+        """Fetch a single session by ID. Raises 404 if it does not exist or belong to the user."""
+        session = self._get_owned_session(session_id, user_id)
         _ = session.tags  # load tags into memory before session closes
         return session
 
-    def update(self, session_id: int, data: PomodoroSessionUpdate) -> PomodoroSession:
-        """Apply partial updates to a session. Raises 404 if it does not exist."""
-        session = self.db.get(PomodoroSession, session_id)
-        if not session:
-            logger.warning("Session %d not found", session_id)
-            raise HTTPException(status_code=404, detail="Session not found")
+    def update(self, session_id: int, data: PomodoroSessionUpdate, user_id: int) -> PomodoroSession:
+        """Apply partial updates to a session. Raises 404 if it does not exist or belong to the user."""
+        session = self._get_owned_session(session_id, user_id)
 
         if data.task_label is not None:
             session.task_label = data.task_label
@@ -84,12 +87,9 @@ class SessionService:
         _ = session.tags  # load tags into memory before session closes
         return session
 
-    def delete(self, session_id: int) -> None:
-        """Delete a session and its tag links. Raises 404 if it does not exist."""
-        session = self.db.get(PomodoroSession, session_id)
-        if not session:
-            logger.warning("Session %d not found", session_id)
-            raise HTTPException(status_code=404, detail="Session not found")
+    def delete(self, session_id: int, user_id: int) -> None:
+        """Delete a session and its tag links. Raises 404 if it does not exist or belong to the user."""
+        session = self._get_owned_session(session_id, user_id)
         # Remove link table rows first so orphaned tags don't linger in the filter bar
         links = self.db.exec(select(SessionTagLink).where(SessionTagLink.session_id == session_id)).all()
         for link in links:
