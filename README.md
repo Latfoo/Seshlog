@@ -162,12 +162,15 @@ pomodoro-app/
 │   │   └── tag_service.py      # tag business logic
 │   └── main.py               # app entry point
 ├── frontend/
-│   └── src/
-│       └── app.ts            # TypeScript source for the demo UI
-├── static/
-│   ├── index.html            # demo UI HTML
-│   ├── app.js                # compiled frontend JS
-│   └── styles.css            # demo UI styles
+│   ├── src/
+│   │   └── app.ts            # TypeScript source for the demo UI
+│   ├── static/
+│   │   ├── index.html        # demo UI HTML
+│   │   ├── app.js            # compiled frontend JS
+│   │   └── styles.css        # demo UI styles
+│   ├── package.json
+│   └── tsconfig.json
+├── tests/
 ├── .env                      # local environment variables (not committed)
 ├── requirements.txt
 └── README.md
