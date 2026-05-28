@@ -11,9 +11,9 @@ class Config(BaseModel):
     debug: bool = False
     SECRET_KEY: str = os.environ["SECRET_KEY"]
     app_env: str = os.getenv("APP_ENV", "production")
-    db_user: str = os.getenv("DB_USER", "")
-    db_password: str = os.getenv("DB_PASSWORD", "")
-    db_name: str = os.getenv("DB_NAME", "")
+    db_user: str = os.environ["DB_USER"]
+    db_password: str = os.environ["DB_PASSWORD"]
+    db_name: str = os.environ["DB_NAME"]
 
     @property
     def database_url(self) -> str:
