@@ -2,11 +2,10 @@ from jose import jwt, JWTError, ExpiredSignatureError
 from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException, Request, status
 import logging
-import os
+from app.core.config import config
 
 logger = logging.getLogger(__name__)
 
-SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = "HS256"
 TOKEN_EXPIRE_MINUTES = 30
 
@@ -16,10 +15,10 @@ def create_token(user_id: int) -> str:
         "sub": str(user_id),
         "exp": datetime.now(timezone.utc) + timedelta(minutes=TOKEN_EXPIRE_MINUTES)
     }
-    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+    return jwt.encode(payload, config.SECRET_KEY, algorithm=ALGORITHM)
 
 def decode_token(token: str) -> int:
-    payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    payload = jwt.decode(token, config.SECRET_KEY, algorithms=[ALGORITHM])
     return int(payload["sub"])
 
 def get_current_user(request: Request) -> int:
