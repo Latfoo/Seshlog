@@ -465,7 +465,7 @@ function renderSessions(sessions: Session[]): void {
         card.innerHTML = `
             <div class="sinfo">
                 <div class="smeta">
-                    <span class="sbadge s-${session.status}">${STATUS_LABELS[session.status] ?? session.status}</span>
+                    <span class="sbadge s-${escapeHtml(session.status)}">${STATUS_LABELS[session.status] ?? escapeHtml(session.status)}</span>
                     <span class="sdur">${session.duration_minutes} min</span>
                     <span class="sdate">${formatDate(session.started_at)}</span>
                 </div>
