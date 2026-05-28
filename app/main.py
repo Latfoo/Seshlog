@@ -1,7 +1,9 @@
 import logging
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import Response
 from sqlmodel import SQLModel
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from fastapi.staticfiles import StaticFiles
 
@@ -12,6 +14,17 @@ from app.api import sessions, tags, health, frontend, auth
 
 setup_logging()
 logger = logging.getLogger(__name__)
+
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next) -> Response:
+        response = await call_next(request)
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Content-Security-Policy"] = "default-src 'self'"
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        return response
 
 
 @asynccontextmanager
@@ -26,6 +39,8 @@ app = FastAPI(
     description=config.app_description,
     lifespan=lifespan
 )
+
+app.add_middleware(SecurityHeadersMiddleware)
 
 app.mount("/static", StaticFiles(directory="frontend/static"), name="static")
 app.include_router(sessions.router)
