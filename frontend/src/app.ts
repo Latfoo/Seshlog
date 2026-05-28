@@ -15,20 +15,9 @@ interface Session {
     tags: Tag[];
 }
 
-// Token storage
-// The JWT is kept in localStorage so it survives page refreshes.
-// The username is stored separately because decoding the JWT would need a library.
+// The username is saved in localStorage just for display (not a secret).
+// The auth token lives in an httpOnly cookie managed by the server.
 
-function getToken(): string | null {
-    return localStorage.getItem("token");
-}
-function setToken(token: string): void {
-    localStorage.setItem("token", token);
-}
-function clearToken(): void {
-    localStorage.removeItem("token");
-    localStorage.removeItem("username");
-}
 function getSavedUsername(): string {
     return localStorage.getItem("username") ?? "";
 }
@@ -41,56 +30,48 @@ function saveUsername(username: string): void {
 async function fetchJson(url: string, method = "GET", body?: object): Promise<any> {
     const headers: Record<string, string> = { "Content-Type": "application/json" };
 
-    // Attach the JWT to every request so the backend knows who is calling.
-    const token = getToken();
-    if (token) headers["Authorization"] = `Bearer ${token}`;
-
-    const options: RequestInit = { method, headers };
+    const options: RequestInit = { method, headers, credentials: "include" };
     if (body !== undefined) options.body = JSON.stringify(body);
 
     const response = await fetch(url, options);
 
-    // 401 means the token is expired — send the user back to the login screen.
     if (response.status === 401) {
-        clearToken();
         showAuthModal();
         throw new Error("Session expired — please log in again");
     }
 
     if (!response.ok) throw new Error(`Request failed: ${response.status}`);
-    if (response.status === 204) return null;  // 204 = No Content (e.g. DELETE)
+    if (response.status === 204) return null;
     return response.json();
 }
 
 // Auth API calls use plain fetch (not fetchJson) so a wrong password doesn't
 // trigger the "session expired" redirect that fetchJson does on 401.
 
-async function apiLogin(email: string, password: string): Promise<string> {
+async function apiLogin(email: string, password: string): Promise<void> {
     const response = await fetch("/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
+        credentials: "include",
     });
     if (!response.ok) {
         const data = await response.json().catch(() => ({}));
         throw new Error(data.detail ?? "Login failed — check your email and password");
     }
-    const data = await response.json();
-    return data.access_token;
 }
 
-async function apiRegister(email: string, password: string): Promise<string> {
+async function apiRegister(email: string, password: string): Promise<void> {
     const response = await fetch("/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
+        credentials: "include",
     });
     if (!response.ok) {
         const data = await response.json().catch(() => ({}));
         throw new Error(data.detail ?? "Registration failed");
     }
-    const data = await response.json();
-    return data.access_token;
 }
 
 async function apiCreateSession(durationMinutes: number, tags: string[]): Promise<Session> {
@@ -355,10 +336,11 @@ authForm.addEventListener("submit", async (e) => {
     authError.textContent = "";
 
     try {
-        const token = authMode === "login"
-            ? await apiLogin(email, password)
-            : await apiRegister(email, password);
-        setToken(token);
+        if (authMode === "login") {
+            await apiLogin(email, password);
+        } else {
+            await apiRegister(email, password);
+        }
         saveUsername(email);
         hideAuthModal(email);
         await reloadHistory();
@@ -369,8 +351,9 @@ authForm.addEventListener("submit", async (e) => {
     }
 });
 
-btnLogout.addEventListener("click", () => {
-    clearToken();
+btnLogout.addEventListener("click", async () => {
+    await fetch("/auth/logout", { method: "POST", credentials: "include" });
+    localStorage.removeItem("username");
     showAuthModal();
 });
 
@@ -537,15 +520,11 @@ ringEl.style.strokeDashoffset = "0";
 timerTimeEl.textContent = formatTime(Number(durationSel.value) * 60);
 
 (async () => {
-    if (!getToken()) {
-        showAuthModal();
-        return;
-    }
-    hideAuthModal(getSavedUsername());
     try {
         await reloadHistory();
+        hideAuthModal(getSavedUsername());
         await restoreActiveSession();
     } catch {
-        // 401 is already handled inside fetchJson
+        // 401 is already handled inside fetchJson (calls showAuthModal)
     }
 })();
