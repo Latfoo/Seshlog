@@ -7,13 +7,12 @@ from app.core.config import config
 logger = logging.getLogger(__name__)
 
 ALGORITHM = "HS256"
-TOKEN_EXPIRE_MINUTES = 30
 
 
 def create_token(user_id: int) -> str:
     payload = {
         "sub": str(user_id),
-        "exp": datetime.now(timezone.utc) + timedelta(minutes=TOKEN_EXPIRE_MINUTES)
+        "exp": datetime.now(timezone.utc) + timedelta(minutes=config.TOKEN_EXPIRE_MINUTES)
     }
     return jwt.encode(payload, config.SECRET_KEY, algorithm=ALGORITHM)
 
