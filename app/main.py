@@ -4,10 +4,13 @@ from fastapi import FastAPI, Request
 from fastapi.responses import Response
 from sqlmodel import SQLModel
 from starlette.middleware.base import BaseHTTPMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from fastapi.staticfiles import StaticFiles
 
 from app.core.config import config
+from app.core.limiter import limiter
 from app.core.logging import setup_logging
 from app.db.schema import engine
 from app.api import sessions, tags, health, frontend, auth
@@ -40,6 +43,8 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SecurityHeadersMiddleware)
 
 app.mount("/static", StaticFiles(directory="frontend/static"), name="static")
