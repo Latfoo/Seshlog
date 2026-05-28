@@ -9,6 +9,7 @@ class Config(BaseModel):
     app_name: str = "Pomodoro Tracker"
     app_description: str = "Backend for a pomodoro timer with tagging"
     debug: bool = False
+    app_env: str = os.getenv("APP_ENV", "production")
     db_user: str = os.getenv("DB_USER", "")
     db_password: str = os.getenv("DB_PASSWORD", "")
     db_name: str = os.getenv("DB_NAME", "")
