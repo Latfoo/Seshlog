@@ -1,6 +1,6 @@
 # Pomodoro App
 
-A Pomodoro timer with user accounts and session history. You can start work sessions, tag them by topic, pause and resume them, and later filter your history by tag to see where your time went.
+A Pomodoro timer with user accounts, session history, and statistics. You can start work sessions, tag them by topic, pause and resume them, filter your history by tag, and see all-time totals alongside a 30-day activity chart.
 
 The backend is a REST API built with FastAPI and PostgreSQL. Authentication uses JWT stored in HttpOnly cookies with bcrypt password hashing. A TypeScript frontend is included.
 
@@ -11,6 +11,7 @@ The backend is a REST API built with FastAPI and PostgreSQL. Authentication uses
 - Create, update, and delete work sessions
 - Assign multiple tags to a session (many-to-many)
 - Filter session history by tag
+- Statistics: all-time totals (sessions, minutes, average) and a 30-day activity chart, both filterable by tag
 - Session statuses: `in_progress`, `paused`, `completed`
 - Pause duration tracking (`paused_at`, `total_paused_seconds`)
 - Input validation on all endpoints (length limits, allowed characters, value ranges)
@@ -57,6 +58,12 @@ Authentication is cookie-based. After login or register, the server sets an Http
 | ------ | -------- | -------------------------------------------- |
 | `GET`  | `/tags`  | List all tags that have at least one session |
 
+### Statistics
+
+| Method | Endpoint      | Description                                               |
+| ------ | ------------- | --------------------------------------------------------- |
+| `GET`  | `/statistics` | All-time totals + 30-day daily breakdown (`?tag=` filter) |
+
 ## Data model
 
 **UserTable**: `id`, `email`, `hashed_password`
@@ -79,6 +86,7 @@ pomodoro-app/
 │   │   ├── frontend.py         # serves the demo UI
 │   │   ├── health.py           # health check endpoint
 │   │   ├── sessions.py         # session CRUD endpoints
+│   │   ├── statistics.py       # statistics endpoint
 │   │   └── tags.py             # tags endpoint
 │   ├── core/
 │   │   ├── config.py           # environment/settings
@@ -89,12 +97,14 @@ pomodoro-app/
 │   │   └── schema.py           # database table definitions
 │   ├── models/
 │   │   ├── session.py          # session request/response models
+│   │   ├── statistics.py       # statistics response models
 │   │   ├── tag.py              # tag request/response models
 │   │   ├── token.py            # TokenResponse model
 │   │   └── user.py             # UserCreate and User models
 │   ├── services/
 │   │   ├── auth_service.py     # registration and login logic
 │   │   ├── session_service.py  # session business logic
+│   │   ├── statistics_service.py # statistics queries and aggregation
 │   │   └── tag_service.py      # tag business logic
 │   └── main.py                 # app entry point, middleware setup
 ├── frontend/
