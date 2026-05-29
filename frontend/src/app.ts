@@ -15,6 +15,19 @@ interface Session {
     tags: Tag[];
 }
 
+interface DailyStats {
+    date: string;
+    minutes: number;
+    sessions: number;
+}
+
+interface Statistics {
+    total_sessions: number;
+    total_minutes: number;
+    avg_minutes: number;
+    daily: DailyStats[];
+}
+
 // The username is saved in localStorage just for display (not a secret).
 // The auth token lives in an httpOnly cookie managed by the server.
 
@@ -96,6 +109,11 @@ async function apiDeleteSession(id: number): Promise<void> {
 
 async function apiListTags(): Promise<Tag[]> {
     return fetchJson("/tags");
+}
+
+async function apiGetStatistics(filterTag?: string): Promise<Statistics> {
+    const url = filterTag ? `/statistics?tag=${encodeURIComponent(filterTag)}` : "/statistics";
+    return fetchJson(url);
 }
 
 // State
@@ -503,14 +521,135 @@ function renderFilters(tags: Tag[]): void {
     }
 }
 
+function niceMax(n: number): number {
+    for (const s of [10, 20, 30, 45, 60, 90, 120, 180, 240, 360]) {
+        if (n <= s) return s;
+    }
+    return Math.ceil(n / 60) * 60;
+}
+
+function renderStatistics(stats: Statistics): void {
+    const svgNS = "http://www.w3.org/2000/svg";
+
+    (document.getElementById("stat-total-minutes") as HTMLElement).textContent = String(stats.total_minutes);
+    (document.getElementById("stat-total-sessions") as HTMLElement).textContent = String(stats.total_sessions);
+    (document.getElementById("stat-avg-minutes") as HTMLElement).textContent = String(stats.avg_minutes);
+
+    const periodEl = document.getElementById("stats-period") as HTMLElement;
+    periodEl.textContent = activeTagFilter ? `Last 30 days · ${activeTagFilter}` : "Last 30 days";
+
+    const svg = document.getElementById("stats-chart") as Element;
+    svg.innerHTML = "";
+
+    const topPad = 10;
+    const chartH = 58;
+    const barW = 18;
+    const gap = 2;
+    const leftMargin = 38;
+    const svgWidth = 638;           // must match the viewBox width in index.html
+    const baseY = topPad + chartH;  // 68 — chart baseline
+    const labelY = baseY + 14;      // 82 — date text baseline
+
+    const maxMins = Math.max(...stats.daily.map(d => d.minutes), 1);
+    const scaleMax = niceMax(maxMins);
+
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+
+    // Gridlines and Y-axis labels at half and full scale
+    for (const tick of [Math.round(scaleMax / 2), scaleMax]) {
+        const gy = baseY - Math.round((tick / scaleMax) * chartH);
+
+        const line = document.createElementNS(svgNS, "line");
+        line.setAttribute("x1", String(leftMargin));
+        line.setAttribute("x2", String(svgWidth));
+        line.setAttribute("y1", String(gy));
+        line.setAttribute("y2", String(gy));
+        line.setAttribute("class", "grid-line");
+        svg.appendChild(line);
+
+        const lbl = document.createElementNS(svgNS, "text");
+        lbl.setAttribute("x", String(leftMargin - 4));
+        lbl.setAttribute("y", String(gy + 3));
+        lbl.setAttribute("text-anchor", "end");
+        lbl.setAttribute("class", "chart-label");
+        lbl.textContent = `${tick}m`;
+        svg.appendChild(lbl);
+    }
+
+    // Baseline
+    const baseLine = document.createElementNS(svgNS, "line");
+    baseLine.setAttribute("x1", String(leftMargin));
+    baseLine.setAttribute("x2", "638");
+    baseLine.setAttribute("y1", String(baseY));
+    baseLine.setAttribute("y2", String(baseY));
+    baseLine.setAttribute("class", "grid-base");
+    svg.appendChild(baseLine);
+
+    // Bars
+    for (let i = 0; i < stats.daily.length; i++) {
+        const day = stats.daily[i];
+        const x = leftMargin + i * (barW + gap);
+        const isToday = day.date === todayStr;
+        const barH = day.minutes > 0 ? Math.max(4, Math.round((day.minutes / scaleMax) * chartH)) : 2;
+        const y = baseY - barH;
+
+        const rect = document.createElementNS(svgNS, "rect");
+        rect.setAttribute("x", String(x));
+        rect.setAttribute("y", String(y));
+        rect.setAttribute("width", String(barW));
+        rect.setAttribute("height", String(barH));
+        rect.setAttribute("rx", "2");
+
+        let cls = "sbar";
+        if (day.minutes > 0) cls += isToday ? " today" : " active";
+        else cls += isToday ? " today-empty" : " empty";
+        rect.setAttribute("class", cls);
+
+        const title = document.createElementNS(svgNS, "title");
+        const dateLabel = new Date(day.date + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" });
+        title.textContent = day.minutes > 0
+            ? `${dateLabel}: ${day.minutes} min (${day.sessions} session${day.sessions !== 1 ? "s" : ""})`
+            : `${dateLabel}: no sessions`;
+        rect.appendChild(title);
+        svg.appendChild(rect);
+
+        // Minute value above bar when tall enough to have room
+        if (day.minutes > 0 && barH >= 14) {
+            const val = document.createElementNS(svgNS, "text");
+            val.setAttribute("x", String(x + barW / 2));
+            val.setAttribute("y", String(y - 2));
+            val.setAttribute("text-anchor", "middle");
+            val.setAttribute("class", "bar-label");
+            val.textContent = String(day.minutes);
+            svg.appendChild(val);
+        }
+
+        // Date labels at start, midpoint, and the actual today bar
+        if (i === 0 || i === 14 || isToday) {
+            const text = document.createElementNS(svgNS, "text");
+            text.setAttribute("x", String(x + barW / 2));
+            text.setAttribute("y", String(labelY));
+            text.setAttribute("text-anchor", i === 0 ? "start" : isToday ? "end" : "middle");
+            text.setAttribute("class", isToday ? "chart-label today-label" : "chart-label");
+            text.textContent = isToday
+                ? "Today"
+                : new Date(day.date + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" });
+            svg.appendChild(text);
+        }
+    }
+}
+
 async function reloadHistory(): Promise<void> {
     const filterArg = activeTagFilter !== "" ? activeTagFilter : undefined;
-    const [sessions, tags] = await Promise.all([
+    const [sessions, tags, stats] = await Promise.all([
         apiListSessions(filterArg),
         apiListTags(),
+        apiGetStatistics(filterArg),
     ]);
     renderSessions(sessions);
     renderFilters(tags);
+    renderStatistics(stats);
 }
 
 // Startup
