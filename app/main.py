@@ -13,7 +13,7 @@ from app.core.config import config
 from app.core.limiter import limiter
 from app.core.logging import setup_logging
 from app.db.schema import engine
-from app.api import sessions, tags, health, frontend, auth
+from app.api import sessions, tags, health, frontend, auth, statistics
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -53,3 +53,4 @@ app.include_router(tags.router)
 app.include_router(health.router)
 app.include_router(frontend.router)
 app.include_router(auth.router)
+app.include_router(statistics.router)

@@ -78,15 +78,46 @@
       </div>
     </section>
 
+    <div class="right-col">
+    <section class="stats-section" id="stats-section">
+      <div class="stats-head">
+        <div class="stats-title-row">
+          <h2>Statistics</h2>
+          <span class="stats-period" id="stats-period">Last 30 days</span>
+        </div>
+        <div class="filters" id="filters"></div>
+      </div>
+
+      <div class="stat-cards">
+        <div class="stat-card">
+          <span class="stat-value" id="stat-total-minutes">—</span>
+          <span class="stat-label">Total minutes</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-value" id="stat-total-sessions">—</span>
+          <span class="stat-label">Sessions</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-value" id="stat-avg-minutes">—</span>
+          <span class="stat-label">Avg per session</span>
+        </div>
+      </div>
+
+      <div class="chart-wrap">
+        <svg id="stats-chart" viewBox="0 0 638 90" aria-hidden="true"></svg>
+      </div>
+
+    </section>
+
     <section class="history-section">
       <div class="history-head">
         <h2>Sessions</h2>
-        <div class="filters" id="filters"></div>
       </div>
       <div class="sessions" id="sessions">
         <p class="empty">No sessions yet — start your first Pomodoro!</p>
       </div>
     </section>
+    </div>
 
   </main>
 
