@@ -570,9 +570,10 @@ select:disabled { opacity: 0.6; }
   color: var(--muted);
 }
 
-.stats-period {
+.stats-sublabel {
   font-size: 0.72rem;
   color: var(--muted);
+  margin-top: -6px;
 }
 
 /* Summary cards */
