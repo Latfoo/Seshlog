@@ -228,26 +228,17 @@ function startTicking(): void {
             if (activeSession !== null) {
                 await apiUpdateSession(activeSession.id, "completed");
             }
-            playBeep();
+            notify();
             await reloadHistory();
             resetTimerUI();
         }
     }, 1000);
 }
 
-function playBeep(): void {
-    try {
-        const audio = new AudioContext();
-        const osc = audio.createOscillator();
-        const gain = audio.createGain();
-        osc.connect(gain);
-        gain.connect(audio.destination);
-        osc.frequency.value = 880;
-        gain.gain.setValueAtTime(0.25, audio.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, audio.currentTime + 0.8);
-        osc.start();
-        osc.stop(audio.currentTime + 0.8);
-    } catch (_) {}
+function notify(): void {
+    if (Notification.permission === "granted") {
+        new Notification("Pomodoro complete!", { body: "Time to take a break." });
+    }
 }
 
 function resetTimerUI(): void {
@@ -445,7 +436,7 @@ document.addEventListener("visibilitychange", async () => {
             clearInterval(timerIntervalId!);
             timerIntervalId = null;
             await apiUpdateSession(activeSession.id, "completed");
-            playBeep();
+            notify();
             await reloadHistory();
             resetTimerUI();
             return;
@@ -670,6 +661,8 @@ async function reloadHistory(): Promise<void> {
 }
 
 // Startup
+
+Notification.requestPermission();
 
 ringEl.style.strokeDasharray  = String(RING_CIRCUMFERENCE);
 ringEl.style.strokeDashoffset = "0";
