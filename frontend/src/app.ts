@@ -438,6 +438,23 @@ durationSel.addEventListener("change", () => {
     }
 });
 
+document.addEventListener("visibilitychange", async () => {
+    if (document.visibilityState === "visible" && activeSession !== null) {
+        remainingSeconds = computeRemainingSeconds(activeSession);
+        if (remainingSeconds <= 0) {
+            clearInterval(timerIntervalId!);
+            timerIntervalId = null;
+            await apiUpdateSession(activeSession.id, "completed");
+            playBeep();
+            await reloadHistory();
+            resetTimerUI();
+            return;
+        }
+        timerTimeEl.textContent = formatTime(remainingSeconds);
+        updateRing(remainingSeconds, totalSeconds);
+    }
+});
+
 // Session history
 
 function escapeHtml(text: string): string {
