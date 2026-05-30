@@ -1,8 +1,6 @@
 # Pomodoro App
 
-A Pomodoro timer with user accounts, session history, and statistics. You can start work sessions, tag them by topic, pause and resume them, filter your history by tag, and see all-time totals alongside a 30-day activity chart.
-
-The backend is a REST API built with FastAPI and PostgreSQL. Authentication uses JWT stored in HttpOnly cookies with bcrypt password hashing. A TypeScript frontend is included.
+Pomodoro timer with a RESTful FastAPI and PostgreSQL backend. Sessions have a many-to-many relationship with tags, and the API tracks work sessions, statistics, and history per user with JWT authentication. You can start sessions, tag them by topic, pause and resume them, filter your history by tag, and view all-time totals alongside a 30-day activity chart. A TypeScript frontend ties it all together.
 
 ## Features
 
@@ -14,6 +12,11 @@ The backend is a REST API built with FastAPI and PostgreSQL. Authentication uses
 - Statistics: all-time totals (sessions, minutes, average) and a 30-day activity chart, both filterable by tag
 - Session statuses: `in_progress`, `paused`, `completed`
 - Pause duration tracking (`paused_at`, `total_paused_seconds`)
+- Countdown timer with an animated SVG progress ring
+- Active session is restored when the page is reloaded
+- Timer stays accurate when switching tabs (corrects on visibility change, auto-completes if it expired while hidden)
+- Browser notification when the timer completes
+- Rate limiting on all endpoints
 - Input validation on all endpoints (length limits, allowed characters, value ranges)
 - Security headers middleware
 - Auto-generated interactive API docs at `/docs`
