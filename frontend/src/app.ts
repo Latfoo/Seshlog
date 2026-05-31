@@ -233,12 +233,15 @@ function startTicking(): void {
         if (remainingSeconds <= 0) {
             clearInterval(timerIntervalId!);
             timerIntervalId = null;
-            if (activeSession !== null) {
-                await apiUpdateSession(activeSession.id, "completed");
+            try {
+                if (activeSession !== null) {
+                    await apiUpdateSession(activeSession.id, "completed");
+                }
+                notify();
+                await reloadHistory();
+            } finally {
+                resetTimerUI();
             }
-            notify();
-            await reloadHistory();
-            resetTimerUI();
         }
     }, 1000);
 }
