@@ -114,10 +114,12 @@ pomodoro-app/
 │   └── main.py                 # app entry point, middleware setup
 ├── frontend/
 │   ├── src/
-│   │   └── app.ts              # TypeScript source for the demo UI
+│   │   ├── app.ts              # TypeScript source for the demo UI
+│   │   └── types.ts            # shared TypeScript interfaces
 │   ├── static/
 │   │   ├── index.html          # demo UI HTML
 │   │   ├── app.js              # compiled frontend JS
+│   │   ├── types.js            # compiled types
 │   │   └── styles.css          # demo UI styles
 │   ├── package.json
 │   └── tsconfig.json

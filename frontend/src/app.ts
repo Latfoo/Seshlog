@@ -1,32 +1,4 @@
-// Types
-
-interface Tag {
-    id: number;
-    name: string;
-}
-
-interface Session {
-    id: number;
-    duration_minutes: number;
-    started_at: string;
-    status: string;  // "in_progress", "completed", or "paused"
-    paused_at: string | null;
-    total_paused_seconds: number;
-    tags: Tag[];
-}
-
-interface DailyStats {
-    date: string;
-    minutes: number;
-    sessions: number;
-}
-
-interface Statistics {
-    total_sessions: number;
-    total_minutes: number;
-    avg_minutes: number;
-    daily: DailyStats[];
-}
+import { Session, Tag, Statistics, DailyStats } from "./types";
 
 // The username is saved in localStorage just for display (not a secret).
 // The auth token lives in an httpOnly cookie managed by the server.

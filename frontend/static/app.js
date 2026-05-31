@@ -1,5 +1,3 @@
-"use strict";
-// Types
 // The username is saved in localStorage just for display (not a secret).
 // The auth token lives in an httpOnly cookie managed by the server.
 function getSavedUsername() {
@@ -27,6 +25,10 @@ async function fetchJson(url, method = "GET", body) {
 }
 // Auth API calls use plain fetch (not fetchJson) so a wrong password doesn't
 // trigger the "session expired" redirect that fetchJson does on 401.
+async function getErrorDetail(response) {
+    const data = await response.json().catch(() => ({}));
+    return data.detail;
+}
 async function apiLogin(email, password) {
     const response = await fetch("/auth/login", {
         method: "POST",
@@ -35,8 +37,7 @@ async function apiLogin(email, password) {
         credentials: "include",
     });
     if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.detail ?? "Login failed — check your email and password");
+        throw new Error(await getErrorDetail(response) ?? "Login failed — check your email and password");
     }
 }
 async function apiRegister(email, password) {
@@ -47,8 +48,7 @@ async function apiRegister(email, password) {
         credentials: "include",
     });
     if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.detail ?? "Registration failed");
+        throw new Error(await getErrorDetail(response) ?? "Registration failed");
     }
 }
 async function apiCreateSession(durationMinutes, tags) {
@@ -57,9 +57,11 @@ async function apiCreateSession(durationMinutes, tags) {
         tags: tags,
     });
 }
+function filteredUrl(path, filterTag) {
+    return filterTag ? `${path}?tag=${encodeURIComponent(filterTag)}` : path;
+}
 async function apiListSessions(filterTag) {
-    const url = filterTag ? `/sessions?tag=${encodeURIComponent(filterTag)}` : "/sessions";
-    return fetchJson(url);
+    return fetchJson(filteredUrl("/sessions", filterTag));
 }
 async function apiUpdateSession(id, status) {
     return fetchJson(`/sessions/${id}`, "PATCH", { status });
@@ -71,8 +73,7 @@ async function apiListTags() {
     return fetchJson("/tags");
 }
 async function apiGetStatistics(filterTag) {
-    const url = filterTag ? `/statistics?tag=${encodeURIComponent(filterTag)}` : "/statistics";
-    return fetchJson(url);
+    return fetchJson(filteredUrl("/statistics", filterTag));
 }
 // State
 let activeSession = null;
@@ -107,6 +108,13 @@ const headerUser = document.getElementById("header-user");
 const headerUname = document.getElementById("header-username");
 const btnLogout = document.getElementById("btn-logout");
 // Timer
+function setTimerActive(active) {
+    durationSel.disabled = active;
+    tagInput.disabled = active;
+    btnStart.hidden = active;
+    btnPause.hidden = !active;
+    btnDone.hidden = !active;
+}
 // The server sends naive UTC datetimes without a timezone suffix.
 // Without 'Z', browsers parse them as local time instead of UTC, which breaks
 // computeRemainingSeconds for anyone whose browser timezone differs from the server.
@@ -136,11 +144,7 @@ async function restoreActiveSession() {
     ringEl.style.strokeDasharray = String(RING_CIRCUMFERENCE);
     updateRing(remainingSeconds, totalSeconds);
     timerTimeEl.textContent = formatTime(remainingSeconds);
-    durationSel.disabled = true;
-    tagInput.disabled = true;
-    btnStart.hidden = true;
-    btnPause.hidden = false;
-    btnDone.hidden = false;
+    setTimerActive(true);
     if (active.status === "in_progress") {
         ringEl.classList.remove("paused");
         btnPause.textContent = "Pause";
@@ -201,12 +205,8 @@ function resetTimerUI() {
     timerTimeEl.textContent = formatTime(Number(durationSel.value) * 60);
     ringEl.style.strokeDashoffset = "0";
     ringEl.classList.remove("paused");
-    durationSel.disabled = false;
-    tagInput.disabled = false;
+    setTimerActive(false);
     chipsEl.innerHTML = "";
-    btnStart.hidden = false;
-    btnPause.hidden = true;
-    btnDone.hidden = true;
     btnPause.textContent = "Pause";
 }
 // Tag chip UI
@@ -316,11 +316,7 @@ btnStart.addEventListener("click", async () => {
         ringEl.classList.remove("paused");
         timerTimeEl.textContent = formatTime(remainingSeconds);
         startTicking();
-        durationSel.disabled = true;
-        tagInput.disabled = true;
-        btnStart.hidden = true;
-        btnPause.hidden = false;
-        btnDone.hidden = false;
+        setTimerActive(true);
         await reloadHistory();
     }
     catch (error) {
@@ -584,3 +580,4 @@ timerTimeEl.textContent = formatTime(Number(durationSel.value) * 60);
         // 401 is already handled inside fetchJson (calls showAuthModal)
     }
 })();
+export {};
