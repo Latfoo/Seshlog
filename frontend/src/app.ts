@@ -179,18 +179,9 @@ async function restoreActiveSession(): Promise<void> {
     const active = sessions.find(s => s.status === "in_progress" || s.status === "paused");
     if (!active) return;
 
-    const remaining = computeRemainingSeconds(active);
-
-    if (remaining <= 0) {
-        // Timer expired while the page was closed --> mark it complete on the server
-        await apiUpdateSession(active.id, "completed");
-        await reloadHistory();
-        return;
-    }
-
     activeSession = active;
     totalSeconds = active.duration_minutes * 60;
-    remainingSeconds = remaining;
+    remainingSeconds = computeRemainingSeconds(active);
 
     ringEl.style.strokeDasharray = String(RING_CIRCUMFERENCE);
     updateRing(remainingSeconds, totalSeconds);

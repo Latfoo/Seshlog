@@ -45,8 +45,33 @@ class SessionService:
         logger.info("Session %d created for user %d", new_session.id, user_id)
         return new_session
 
+    def _auto_complete_expired(self, user_id: int) -> None:
+        """Mark any in_progress sessions that have run past their duration as completed.
+
+        This cleans up sessions whose timer expired while the browser tab was closed,
+        so they don't stay stuck as 'in_progress' forever.
+        """
+        now = datetime.now()
+        in_progress = self.db.exec(
+            select(PomodoroSession)
+            .where(PomodoroSession.user_id == user_id)
+            .where(PomodoroSession.status == SessionStatus.in_progress)
+        ).all()
+        any_changed = False
+        for s in in_progress:
+            elapsed = (now - s.started_at).total_seconds() - s.total_paused_seconds
+            if elapsed >= s.duration_minutes * 60:
+                s.status = SessionStatus.completed
+                s.duration_minutes = max(1, round(elapsed / 60))
+                self.db.add(s)
+                any_changed = True
+                logger.info("Auto-completed expired session %d for user %d", s.id, s.user_id)
+        if any_changed:
+            self.db.commit()
+
     def list(self, tag: str | None = None, user_id: int = 0) -> list[PomodoroSession]:
         """Return all sessions belonging to the user, optionally filtered by tag."""
+        self._auto_complete_expired(user_id)
         query = select(PomodoroSession).where(PomodoroSession.user_id == user_id)
         if tag is not None:
             # join through the link table to filter by tag name
