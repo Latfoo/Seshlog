@@ -154,12 +154,20 @@ const btnLogout     = document.getElementById("btn-logout")      as HTMLButtonEl
 
 // Timer
 
+// The server sends naive UTC datetimes without a timezone suffix.
+// Without 'Z', browsers parse them as local time instead of UTC, which breaks
+// computeRemainingSeconds for anyone whose browser timezone differs from the server.
+function parseServerTime(isoString: string): number {
+    const s = (isoString.endsWith('Z') || isoString.includes('+')) ? isoString : isoString + 'Z';
+    return new Date(s).getTime();
+}
+
 function computeRemainingSeconds(session: Session): number {
-    const startedMs = new Date(session.started_at).getTime();
+    const startedMs = parseServerTime(session.started_at);
     const nowMs = Date.now();
     const pausedMs = session.total_paused_seconds * 1000;
     const currentPauseMs = session.paused_at
-        ? nowMs - new Date(session.paused_at).getTime()
+        ? nowMs - parseServerTime(session.paused_at)
         : 0;
     const activeElapsedMs = nowMs - startedMs - pausedMs - currentPauseMs;
     const targetMs = session.duration_minutes * 60 * 1000;
@@ -456,7 +464,7 @@ function escapeHtml(text: string): string {
 }
 
 function formatDate(isoString: string): string {
-    return new Date(isoString).toLocaleString(undefined, {
+    return new Date(parseServerTime(isoString)).toLocaleString(undefined, {
         month: "short",
         day: "numeric",
         hour: "2-digit",
