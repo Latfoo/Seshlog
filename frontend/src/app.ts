@@ -61,6 +61,11 @@ async function fetchJson(url: string, method = "GET", body?: object): Promise<an
 // Auth API calls use plain fetch (not fetchJson) so a wrong password doesn't
 // trigger the "session expired" redirect that fetchJson does on 401.
 
+async function getErrorDetail(response: Response): Promise<string | undefined> {
+    const data = await response.json().catch(() => ({}));
+    return (data as any).detail;
+}
+
 async function apiLogin(email: string, password: string): Promise<void> {
     const response = await fetch("/auth/login", {
         method: "POST",
@@ -69,8 +74,7 @@ async function apiLogin(email: string, password: string): Promise<void> {
         credentials: "include",
     });
     if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.detail ?? "Login failed — check your email and password");
+        throw new Error(await getErrorDetail(response) ?? "Login failed — check your email and password");
     }
 }
 
@@ -82,8 +86,7 @@ async function apiRegister(email: string, password: string): Promise<void> {
         credentials: "include",
     });
     if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.detail ?? "Registration failed");
+        throw new Error(await getErrorDetail(response) ?? "Registration failed");
     }
 }
 
@@ -94,9 +97,12 @@ async function apiCreateSession(durationMinutes: number, tags: string[]): Promis
     });
 }
 
+function filteredUrl(path: string, filterTag?: string): string {
+    return filterTag ? `${path}?tag=${encodeURIComponent(filterTag)}` : path;
+}
+
 async function apiListSessions(filterTag?: string): Promise<Session[]> {
-    const url = filterTag ? `/sessions?tag=${encodeURIComponent(filterTag)}` : "/sessions";
-    return fetchJson(url);
+    return fetchJson(filteredUrl("/sessions", filterTag));
 }
 
 async function apiUpdateSession(id: number, status: string): Promise<Session> {
@@ -112,8 +118,7 @@ async function apiListTags(): Promise<Tag[]> {
 }
 
 async function apiGetStatistics(filterTag?: string): Promise<Statistics> {
-    const url = filterTag ? `/statistics?tag=${encodeURIComponent(filterTag)}` : "/statistics";
-    return fetchJson(url);
+    return fetchJson(filteredUrl("/statistics", filterTag));
 }
 
 // State
@@ -154,6 +159,14 @@ const btnLogout     = document.getElementById("btn-logout")      as HTMLButtonEl
 
 // Timer
 
+function setTimerActive(active: boolean): void {
+    durationSel.disabled = active;
+    tagInput.disabled = active;
+    btnStart.hidden = active;
+    btnPause.hidden = !active;
+    btnDone.hidden = !active;
+}
+
 // The server sends naive UTC datetimes without a timezone suffix.
 // Without 'Z', browsers parse them as local time instead of UTC, which breaks
 // computeRemainingSeconds for anyone whose browser timezone differs from the server.
@@ -186,11 +199,7 @@ async function restoreActiveSession(): Promise<void> {
     ringEl.style.strokeDasharray = String(RING_CIRCUMFERENCE);
     updateRing(remainingSeconds, totalSeconds);
     timerTimeEl.textContent = formatTime(remainingSeconds);
-    durationSel.disabled = true;
-    tagInput.disabled = true;
-    btnStart.hidden = true;
-    btnPause.hidden = false;
-    btnDone.hidden = false;
+    setTimerActive(true);
 
     if (active.status === "in_progress") {
         ringEl.classList.remove("paused");
@@ -255,12 +264,8 @@ function resetTimerUI(): void {
     timerTimeEl.textContent = formatTime(Number(durationSel.value) * 60);
     ringEl.style.strokeDashoffset = "0";
     ringEl.classList.remove("paused");
-    durationSel.disabled = false;
-    tagInput.disabled = false;
+    setTimerActive(false);
     chipsEl.innerHTML = "";
-    btnStart.hidden = false;
-    btnPause.hidden = true;
-    btnDone.hidden = true;
     btnPause.textContent = "Pause";
 }
 
@@ -381,11 +386,7 @@ btnStart.addEventListener("click", async () => {
         ringEl.classList.remove("paused");
         timerTimeEl.textContent = formatTime(remainingSeconds);
         startTicking();
-        durationSel.disabled = true;
-        tagInput.disabled = true;
-        btnStart.hidden = true;
-        btnPause.hidden = false;
-        btnDone.hidden = false;
+        setTimerActive(true);
         await reloadHistory();
     } catch (error) {
         console.error(error);
