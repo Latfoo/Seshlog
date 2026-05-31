@@ -20,18 +20,20 @@ Pomodoro timer with a RESTful FastAPI and PostgreSQL backend. Sessions have a ma
 - Input validation on all endpoints (length limits, allowed characters, value ranges)
 - Security headers middleware
 - Auto-generated interactive API docs at `/docs`
+- Containerised with Docker Compose (backend + PostgreSQL)
 
 ## Tech stack
 
-| Layer         | Technology                     |
-| ------------- | ------------------------------ |
-| API           | FastAPI                        |
-| ORM           | SQLModel (built on SQLAlchemy) |
-| Database      | PostgreSQL                     |
-| Validation    | Pydantic v2                    |
-| Auth          | JWT (python-jose) + bcrypt     |
-| Rate limiting | slowapi                        |
-| Frontend      | TypeScript                     |
+| Layer            | Technology                     |
+| ---------------- | ------------------------------ |
+| API              | FastAPI                        |
+| ORM              | SQLModel (built on SQLAlchemy) |
+| Database         | PostgreSQL                     |
+| Validation       | Pydantic v2                    |
+| Auth             | JWT (python-jose) + bcrypt     |
+| Rate limiting    | slowapi                        |
+| Frontend         | TypeScript                     |
+| Containerisation | Docker + Docker Compose        |
 
 ## API overview
 
@@ -121,43 +123,26 @@ pomodoro-app/
 │   └── tsconfig.json
 ├── .env                        # local environment variables (not committed)
 ├── requirements.txt
+├── Dockerfile                  # builds the backend image
+├── docker-compose.yml          # defines the backend and database services
+├── .dockerignore
 └── README.md
 ```
 
 ## Running locally
 
-### 1. Clone and set up the environment
+### With Docker (recommended)
+
+Requires [Docker](https://docs.docker.com/get-docker/) with the Compose plugin.
+
+#### 1. Clone the repo
 
 ```bash
 git clone https://github.com/Latfoo/pomodoro-app
 cd pomodoro-app
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
 ```
 
-### 2. Set up PostgreSQL
-
-If you don't have PostgreSQL installed:
-
-```bash
-sudo apt install postgresql postgresql-contrib   # Ubuntu/Debian
-brew install postgresql && brew services start postgresql  # macOS
-```
-
-Then create a database and user:
-
-```bash
-sudo -u postgres psql
-```
-
-```sql
-CREATE USER your_user WITH PASSWORD 'your_password';
-CREATE DATABASE pomodoro OWNER your_user;
-\q
-```
-
-### 3. Configure the environment
+#### 2. Configure the environment
 
 Create a `.env` file in the project root:
 
@@ -169,9 +154,57 @@ SECRET_KEY=your-secret-key
 APP_ENV=development
 ```
 
-`APP_ENV=development` disables the `Secure` flag on the auth cookie so it works over plain HTTP on localhost. Leave it out (or set it to `production`) when deploying over HTTPS.
+`APP_ENV=development` disables the `Secure` flag on the auth cookie so it works over plain HTTP on localhost. Set it to `production` when deploying over HTTPS.
 
-### 4. Start the server
+#### 3. Start the app
+
+```bash
+docker compose up --build
+```
+
+This starts two containers: the FastAPI backend and a PostgreSQL database. The API runs at `http://localhost:8000` and the interactive docs are at `http://localhost:8000/docs`.
+
+### Without Docker
+
+Requires Python 3.12+ and PostgreSQL installed locally.
+
+#### 1. Clone and set up the environment
+
+```bash
+git clone https://github.com/Latfoo/pomodoro-app
+cd pomodoro-app
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+#### 2. Set up PostgreSQL
+
+```bash
+sudo -u postgres psql
+```
+
+```sql
+CREATE USER your_user WITH PASSWORD 'your_password';
+CREATE DATABASE pomodoro OWNER your_user;
+\q
+```
+
+#### 3. Configure the environment
+
+Create a `.env` file in the project root:
+
+```env
+DB_USER=your_user
+DB_PASSWORD=your_password
+DB_NAME=pomodoro
+SECRET_KEY=your-secret-key
+APP_ENV=development
+```
+
+`APP_ENV=development` disables the `Secure` flag on the auth cookie so it works over plain HTTP on localhost. Set it to `production` when deploying over HTTPS.
+
+#### 4. Start the server
 
 ```bash
 uvicorn app.main:app --reload
