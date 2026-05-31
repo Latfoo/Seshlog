@@ -1,12 +1,6 @@
-// The username is saved in localStorage just for display (not a secret).
-// The auth token lives in an httpOnly cookie managed by the server.
-function getSavedUsername() {
-    return localStorage.getItem("username") ?? "";
-}
-function saveUsername(username) {
-    localStorage.setItem("username", username);
-}
-// API helpers
+// =============================================================================
+// API Helpers
+// =============================================================================
 async function fetchJson(url, method = "GET", body) {
     const headers = { "Content-Type": "application/json" };
     const options = { method, headers, credentials: "include" };
@@ -75,7 +69,9 @@ async function apiListTags() {
 async function apiGetStatistics(filterTag) {
     return fetchJson(filteredUrl("/statistics", filterTag));
 }
+// =============================================================================
 // State
+// =============================================================================
 let activeSession = null;
 let timerIntervalId = null;
 let remainingSeconds = 0;
@@ -84,7 +80,9 @@ let pendingTags = []; // tags typed into the tag input, not yet saved
 let activeTagFilter = ""; // the tag filter currently selected in history
 // Circumference of the SVG ring (radius = 80)
 const RING_CIRCUMFERENCE = 2 * Math.PI * 80;
-// DOM elements
+// =============================================================================
+// DOM Elements
+// =============================================================================
 const durationSel = document.getElementById("duration");
 const tagInput = document.getElementById("tag-input");
 const chipsEl = document.getElementById("chips");
@@ -95,7 +93,7 @@ const btnPause = document.getElementById("btn-pause");
 const btnDone = document.getElementById("btn-done");
 const sessionsEl = document.getElementById("sessions");
 const filtersEl = document.getElementById("filters");
-// Auth modal elements
+// -- Auth modal --
 const authModal = document.getElementById("auth-modal");
 const authForm = document.getElementById("auth-form");
 const authUserInput = document.getElementById("auth-username");
@@ -107,7 +105,78 @@ const tabRegister = document.getElementById("tab-register");
 const headerUser = document.getElementById("header-user");
 const headerUname = document.getElementById("header-username");
 const btnLogout = document.getElementById("btn-logout");
+// =============================================================================
+// Auth Modal
+// =============================================================================
+// The username is saved in localStorage just for display (not a secret).
+// The auth token lives in an httpOnly cookie managed by the server.
+function getSavedUsername() {
+    return localStorage.getItem("username") ?? "";
+}
+function saveUsername(username) {
+    localStorage.setItem("username", username);
+}
+let authMode = "login";
+function showAuthModal() {
+    authModal.hidden = false;
+    authError.textContent = "";
+    authUserInput.value = "";
+    authPassInput.value = "";
+    headerUser.hidden = true;
+}
+function hideAuthModal(username) {
+    authModal.hidden = true;
+    headerUser.hidden = false;
+    headerUname.textContent = username;
+}
+tabLogin.addEventListener("click", () => {
+    authMode = "login";
+    tabLogin.classList.add("active");
+    tabRegister.classList.remove("active");
+    authSubmit.textContent = "Log In";
+    authError.textContent = "";
+});
+tabRegister.addEventListener("click", () => {
+    authMode = "register";
+    tabRegister.classList.add("active");
+    tabLogin.classList.remove("active");
+    authSubmit.textContent = "Register";
+    authError.textContent = "";
+});
+authForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const email = authUserInput.value.trim();
+    const password = authPassInput.value;
+    if (!email || !password)
+        return;
+    authSubmit.disabled = true;
+    authError.textContent = "";
+    try {
+        if (authMode === "login") {
+            await apiLogin(email, password);
+        }
+        else {
+            await apiRegister(email, password);
+        }
+        saveUsername(email);
+        hideAuthModal(email);
+        await reloadHistory();
+    }
+    catch (err) {
+        authError.textContent = err.message ?? "Something went wrong";
+    }
+    finally {
+        authSubmit.disabled = false;
+    }
+});
+btnLogout.addEventListener("click", async () => {
+    await fetch("/auth/logout", { method: "POST", credentials: "include" });
+    localStorage.removeItem("username");
+    showAuthModal();
+});
+// =============================================================================
 // Timer
+// =============================================================================
 function setTimerActive(active) {
     durationSel.disabled = active;
     tagInput.disabled = active;
@@ -209,7 +278,9 @@ function resetTimerUI() {
     chipsEl.innerHTML = "";
     btnPause.textContent = "Pause";
 }
-// Tag chip UI
+// =============================================================================
+// Tag Chip UI
+// =============================================================================
 function renderChips() {
     chipsEl.innerHTML = "";
     for (const tag of pendingTags) {
@@ -245,66 +316,9 @@ tagInput.addEventListener("keydown", (event) => {
 });
 // Clicking anywhere in the tag box should focus the input
 document.getElementById("tags-wrap").addEventListener("click", () => tagInput.focus());
-// Auth modal
-let authMode = "login";
-function showAuthModal() {
-    authModal.hidden = false;
-    authError.textContent = "";
-    authUserInput.value = "";
-    authPassInput.value = "";
-    headerUser.hidden = true;
-}
-function hideAuthModal(username) {
-    authModal.hidden = true;
-    headerUser.hidden = false;
-    headerUname.textContent = username;
-}
-tabLogin.addEventListener("click", () => {
-    authMode = "login";
-    tabLogin.classList.add("active");
-    tabRegister.classList.remove("active");
-    authSubmit.textContent = "Log In";
-    authError.textContent = "";
-});
-tabRegister.addEventListener("click", () => {
-    authMode = "register";
-    tabRegister.classList.add("active");
-    tabLogin.classList.remove("active");
-    authSubmit.textContent = "Register";
-    authError.textContent = "";
-});
-authForm.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const email = authUserInput.value.trim();
-    const password = authPassInput.value;
-    if (!email || !password)
-        return;
-    authSubmit.disabled = true;
-    authError.textContent = "";
-    try {
-        if (authMode === "login") {
-            await apiLogin(email, password);
-        }
-        else {
-            await apiRegister(email, password);
-        }
-        saveUsername(email);
-        hideAuthModal(email);
-        await reloadHistory();
-    }
-    catch (err) {
-        authError.textContent = err.message ?? "Something went wrong";
-    }
-    finally {
-        authSubmit.disabled = false;
-    }
-});
-btnLogout.addEventListener("click", async () => {
-    await fetch("/auth/logout", { method: "POST", credentials: "include" });
-    localStorage.removeItem("username");
-    showAuthModal();
-});
-// Timer buttons
+// =============================================================================
+// Timer Buttons
+// =============================================================================
 btnStart.addEventListener("click", async () => {
     btnStart.disabled = true;
     try {
@@ -379,7 +393,9 @@ document.addEventListener("visibilitychange", async () => {
         updateRing(remainingSeconds, totalSeconds);
     }
 });
-// Session history
+// =============================================================================
+// Session History
+// =============================================================================
 function escapeHtml(text) {
     return text
         .replace(/&/g, "&amp;")
@@ -565,7 +581,9 @@ async function reloadHistory() {
     renderFilters(tags);
     renderStatistics(stats);
 }
+// =============================================================================
 // Startup
+// =============================================================================
 Notification.requestPermission();
 ringEl.style.strokeDasharray = String(RING_CIRCUMFERENCE);
 ringEl.style.strokeDashoffset = "0";
