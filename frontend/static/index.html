@@ -24,100 +24,97 @@
     <section class="timer-section">
       <div class="card">
 
-        <!-- <input
-          id="task-input"
-          class="task-input"
-          type="text"
-          placeholder="What are you working on? (optional)"
-          autocomplete="off"
-          maxlength="100"
-        > -->
-
-        <div class="timer-wrap">
-          <svg viewBox="0 0 200 200" id="timer-svg" aria-hidden="true">
-            <circle class="ring-bg"       cx="100" cy="100" r="80" />
-            <circle class="ring-progress" cx="100" cy="100" r="80" id="ring-progress" />
-          </svg>
-          <span class="timer-time" id="timer-time">25:00</span>
-        </div>
-        <div class="settings-row">
-          <div class="field">
-            <label for="duration">Duration</label>
-            <select id="duration">
-              <option value="5">5 min</option>
-              <option value="10">10 min</option>
-              <option value="15">15 min</option>
-              <option value="25" selected>25 min</option>
-              <option value="30">30 min</option>
-              <option value="45">45 min</option>
-              <option value="60">60 min</option>
-            </select>
+        <div class="timer-left">
+          <div class="timer-wrap">
+            <svg viewBox="0 0 200 200" id="timer-svg" aria-hidden="true">
+              <circle class="ring-bg"       cx="100" cy="100" r="80" />
+              <circle class="ring-progress" cx="100" cy="100" r="80" id="ring-progress" />
+            </svg>
+            <span class="timer-time" id="timer-time">25:00</span>
           </div>
+        </div>
 
-          <div class="field">
-            <label>Tags</label>
-            <div class="tags-wrap" id="tags-wrap">
-              <div class="chips" id="chips"></div>
-              <input
-                id="tag-input"
-                type="text"
-                placeholder="Add tag…"
-                autocomplete="off"
-                maxlength="30"
-              >
+        <div class="timer-right">
+          <span class="timer-eyebrow">Focus Timer</span>
+
+          <div class="settings-row">
+            <div class="field">
+              <label for="duration">Duration</label>
+              <select id="duration">
+                <option value="5">5 min</option>
+                <option value="10">10 min</option>
+                <option value="15">15 min</option>
+                <option value="25" selected>25 min</option>
+                <option value="30">30 min</option>
+                <option value="45">45 min</option>
+                <option value="60">60 min</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label>Tags</label>
+              <div class="tags-wrap" id="tags-wrap">
+                <div class="chips" id="chips"></div>
+                <input
+                  id="tag-input"
+                  type="text"
+                  placeholder="Add tag…"
+                  autocomplete="off"
+                  maxlength="30"
+                >
+              </div>
             </div>
           </div>
-        </div>
 
-        <div class="controls">
-          <button id="btn-start" class="btn primary">Start</button>
-          <button id="btn-pause" class="btn secondary" hidden>Pause</button>
-          <button id="btn-done"  class="btn success"   hidden>Done</button>
+          <div class="controls">
+            <button id="btn-start" class="btn primary">Start</button>
+            <button id="btn-pause" class="btn secondary" hidden>Pause</button>
+            <button id="btn-done"  class="btn success"   hidden>Done</button>
+          </div>
         </div>
 
       </div>
     </section>
 
-    <div class="right-col">
-    <section class="stats-section" id="stats-section">
-      <div class="stats-head">
-        <div class="stats-title-row">
+    <div class="bottom-grid">
+
+      <section class="stats-section" id="stats-section">
+        <div class="section-head">
           <h2>Statistics</h2>
+          <div class="filters" id="filters"></div>
         </div>
-        <div class="filters" id="filters"></div>
-      </div>
 
-      <span class="stats-sublabel">All time</span>
-      <div class="stat-cards">
-        <div class="stat-card">
-          <span class="stat-value" id="stat-total-minutes">—</span>
-          <span class="stat-label">Total minutes</span>
+        <span class="stats-sublabel">All time</span>
+        <div class="stat-cards">
+          <div class="stat-card">
+            <span class="stat-value" id="stat-total-minutes">—</span>
+            <span class="stat-label">Total minutes</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-value" id="stat-total-sessions">—</span>
+            <span class="stat-label">Sessions</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-value" id="stat-avg-minutes">—</span>
+            <span class="stat-label">Avg / session</span>
+          </div>
         </div>
-        <div class="stat-card">
-          <span class="stat-value" id="stat-total-sessions">—</span>
-          <span class="stat-label">Sessions</span>
+
+        <span class="stats-sublabel" id="stats-period">Last 30 days</span>
+        <div class="chart-wrap">
+          <svg id="stats-chart" viewBox="0 0 638 90" aria-hidden="true"></svg>
         </div>
-        <div class="stat-card">
-          <span class="stat-value" id="stat-avg-minutes">—</span>
-          <span class="stat-label">Avg per session</span>
+      </section>
+
+      <section class="history-section">
+        <div class="section-head">
+          <h2>Sessions</h2>
         </div>
-      </div>
+        <div class="sessions" id="sessions">
+          <p class="empty">No sessions yet — start your first Pomodoro!</p>
+        </div>
+      </section>
 
-      <span class="stats-sublabel" id="stats-period">Last 30 days</span>
-      <div class="chart-wrap">
-        <svg id="stats-chart" viewBox="0 0 638 90" aria-hidden="true"></svg>
-      </div>
-
-    </section>
-
-    <section class="history-section">
-      <div class="history-head">
-        <h2>Sessions</h2>
-      </div>
-      <div class="sessions" id="sessions">
-        <p class="empty">No sessions yet — start your first Pomodoro!</p>
-      </div>
-    </section>
     </div>
 
   </main>
