@@ -15,6 +15,9 @@ class SessionService:
     def __init__(self, db: Session):
         self.db = db
 
+    def _elapsed_to_minutes(self, elapsed_seconds: float) -> int:
+        return max(1, int(elapsed_seconds) // 60)
+
     def _get_or_create_tags(self, tag_names: list[str]) -> list[Tag]:
         """Look up each tag by name, create it if it doesn't exist yet."""
         tags = []
@@ -62,7 +65,7 @@ class SessionService:
             elapsed = (now - s.started_at).total_seconds() - s.total_paused_seconds
             if elapsed >= s.duration_minutes * 60:
                 s.status = SessionStatus.completed
-                s.duration_minutes = max(1, round(elapsed / 60))
+                s.duration_minutes = self._elapsed_to_minutes(elapsed)
                 self.db.add(s)
                 any_changed = True
                 logger.info("Auto-completed expired session %d for user %d", s.id, s.user_id)
@@ -117,7 +120,7 @@ class SessionService:
                     session.total_paused_seconds += int((now - session.paused_at).total_seconds())
                     session.paused_at = None
                 elapsed_seconds = int((now - session.started_at).total_seconds()) - session.total_paused_seconds
-                session.duration_minutes = max(1, round(elapsed_seconds / 60))
+                session.duration_minutes = self._elapsed_to_minutes(elapsed_seconds)
 
             session.status = data.status
 
