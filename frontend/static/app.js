@@ -174,26 +174,16 @@ function startTicking() {
             if (activeSession !== null) {
                 await apiUpdateSession(activeSession.id, "completed");
             }
-            playBeep();
+            notify();
             await reloadHistory();
             resetTimerUI();
         }
     }, 1000);
 }
-function playBeep() {
-    try {
-        const audio = new AudioContext();
-        const osc = audio.createOscillator();
-        const gain = audio.createGain();
-        osc.connect(gain);
-        gain.connect(audio.destination);
-        osc.frequency.value = 880;
-        gain.gain.setValueAtTime(0.25, audio.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, audio.currentTime + 0.8);
-        osc.start();
-        osc.stop(audio.currentTime + 0.8);
+function notify() {
+    if (Notification.permission === "granted") {
+        new Notification("Pomodoro complete!", { body: "Time to take a break." });
     }
-    catch (_) { }
 }
 function resetTimerUI() {
     if (timerIntervalId !== null) {
@@ -371,6 +361,22 @@ btnDone.addEventListener("click", async () => {
 durationSel.addEventListener("change", () => {
     if (activeSession === null) {
         timerTimeEl.textContent = formatTime(Number(durationSel.value) * 60);
+    }
+});
+document.addEventListener("visibilitychange", async () => {
+    if (document.visibilityState === "visible" && activeSession !== null) {
+        remainingSeconds = computeRemainingSeconds(activeSession);
+        if (remainingSeconds <= 0) {
+            clearInterval(timerIntervalId);
+            timerIntervalId = null;
+            await apiUpdateSession(activeSession.id, "completed");
+            notify();
+            await reloadHistory();
+            resetTimerUI();
+            return;
+        }
+        timerTimeEl.textContent = formatTime(remainingSeconds);
+        updateRing(remainingSeconds, totalSeconds);
     }
 });
 // Session history
@@ -560,6 +566,7 @@ async function reloadHistory() {
     renderStatistics(stats);
 }
 // Startup
+Notification.requestPermission();
 ringEl.style.strokeDasharray = String(RING_CIRCUMFERENCE);
 ringEl.style.strokeDashoffset = "0";
 timerTimeEl.textContent = formatTime(Number(durationSel.value) * 60);
