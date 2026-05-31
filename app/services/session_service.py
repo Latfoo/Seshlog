@@ -18,6 +18,11 @@ class SessionService:
     def _elapsed_to_minutes(self, elapsed_seconds: float) -> int:
         return max(1, int(elapsed_seconds) // 60)
 
+    def _accumulate_pause_time(self, session: PomodoroSession, now: datetime) -> None:
+        if session.paused_at:
+            session.total_paused_seconds += int((now - session.paused_at).total_seconds())
+            session.paused_at = None
+
     def _get_or_create_tags(self, tag_names: list[str]) -> list[Tag]:
         """Look up each tag by name, create it if it doesn't exist yet."""
         tags = []
@@ -109,16 +114,11 @@ class SessionService:
                 session.paused_at = now
 
             elif data.status == SessionStatus.in_progress and session.status == SessionStatus.paused:
-                # Accumulate the time spent in this pause, then clear paused_at
-                if session.paused_at:
-                    session.total_paused_seconds += int((now - session.paused_at).total_seconds())
-                    session.paused_at = None
+                self._accumulate_pause_time(session, now)
 
             elif data.status == SessionStatus.completed:
                 # Accumulate any current pause, then compute actual elapsed work time
-                if session.paused_at:
-                    session.total_paused_seconds += int((now - session.paused_at).total_seconds())
-                    session.paused_at = None
+                self._accumulate_pause_time(session, now)
                 elapsed_seconds = int((now - session.started_at).total_seconds()) - session.total_paused_seconds
                 session.duration_minutes = self._elapsed_to_minutes(elapsed_seconds)
 

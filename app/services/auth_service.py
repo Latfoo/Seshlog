@@ -13,9 +13,12 @@ class UserService():
 
     def __init__(self, db: Session):
         self.db = db
+        
+    def _get_user_by_email(self, email: str) -> UserTable | None:
+        return self.db.exec(select(UserTable).where(UserTable.email == email)).first()
 
     def register_user(self, new_user: UserCreate) -> str:
-        existing_user = self.db.exec(select(UserTable).where(UserTable.email == new_user.email)).first()
+        existing_user = self._get_user_by_email(new_user.email)
         if existing_user:
             logger.warning("Registration failed: email already in use (%s)", new_user.email)
             raise HTTPException(status_code=400, detail="A user with this email already exists.")
@@ -31,7 +34,7 @@ class UserService():
         return create_token(user.id)
 
     def login_user(self, user: UserCreate) -> str:
-        existing_user = self.db.exec(select(UserTable).where(UserTable.email == user.email)).first()
+        existing_user = self._get_user_by_email(user.email)
         if not existing_user:
             logger.warning("Login failed: no account for email (%s)", user.email)
             raise HTTPException(status_code=401, detail="Invalid email or password.")
