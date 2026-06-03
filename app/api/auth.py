@@ -9,15 +9,17 @@ from app.core.limiter import limiter
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
+# How long the auth cookie stays valid (matches TOKEN_EXPIRE_MINUTES in config).
 COOKIE_MAX_AGE = 30 * 60  # 30 minutes
 
 
 def _set_auth_cookie(response: Response, token: str) -> None:
+    """Write the JWT into an httpOnly cookie so JavaScript cannot read it directly."""
     response.set_cookie(
         key="access_token",
         value=token,
         httponly=True,
-        secure=config.app_env != "development",
+        secure=config.app_env != "development",  # only send over HTTPS outside of development
         samesite="strict",
         max_age=COOKIE_MAX_AGE,
         path="/",
@@ -44,5 +46,6 @@ def login(request: Request, user: UserCreate, response: Response):
 
 @router.post("/logout")
 def logout(response: Response):
+    # Deleting the cookie is enough to log out since the JWT lives in the cookie.
     response.delete_cookie(key="access_token", path="/")
     return {"message": "Logged out"}

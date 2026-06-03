@@ -6,21 +6,27 @@ from app.core.config import config
 
 logger = logging.getLogger(__name__)
 
+# The signing algorithm used for JWTs. HS256 is a standard symmetric algorithm.
 ALGORITHM = "HS256"
 
 
 def create_token(user_id: int) -> str:
+    """Create a signed JWT containing the user's ID. The token expires after TOKEN_EXPIRE_MINUTES."""
     payload = {
-        "sub": str(user_id),
+        "sub": str(user_id),  # "sub" (subject) is the standard JWT field for the user identifier
         "exp": datetime.now(timezone.utc) + timedelta(minutes=config.TOKEN_EXPIRE_MINUTES)
     }
     return jwt.encode(payload, config.SECRET_KEY, algorithm=ALGORITHM)
 
 def decode_token(token: str) -> int:
+    """Decode a JWT and return the user ID stored inside it. Raises JWTError if invalid."""
     payload = jwt.decode(token, config.SECRET_KEY, algorithms=[ALGORITHM])
     return int(payload["sub"])
 
 def get_current_user(request: Request) -> int:
+    """FastAPI dependency that reads the auth cookie and returns the logged-in user's ID.
+    Raises 401 if the cookie is missing, expired, or tampered with.
+    Used with Depends() in every protected endpoint."""
     token = request.cookies.get("access_token")
     if not token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")

@@ -17,9 +17,11 @@ class SessionService:
         self.db = db
 
     def _elapsed_to_minutes(self, elapsed_seconds: float) -> int:
+        """Convert elapsed seconds to minutes, rounding up. Always returns at least 1."""
         return max(1, math.ceil(elapsed_seconds / 60))
 
     def _accumulate_pause_time(self, session: PomodoroSession, now: datetime) -> None:
+        """Add the duration of the current pause to total_paused_seconds, then clear paused_at."""
         if session.paused_at:
             session.total_paused_seconds += int((now - session.paused_at).total_seconds())
             session.paused_at = None
@@ -50,7 +52,7 @@ class SessionService:
         self.db.add(new_session)
         self.db.commit()
         self.db.refresh(new_session)
-        _ = new_session.tags  # load tags into memory before session closes
+        _ = new_session.tags  # load tags into memory before the DB session closes
         logger.info("Session %d created for user %d", new_session.id, user_id)
         return new_session
 
@@ -58,7 +60,7 @@ class SessionService:
         """Mark any in_progress sessions that have run past their duration as completed.
 
         This cleans up sessions whose timer expired while the browser tab was closed,
-        so they don't stay stuck as 'in_progress' forever.
+        so they don't stay stuck as in_progress forever.
         """
         now = datetime.now(timezone.utc).replace(tzinfo=None)
         in_progress = self.db.exec(
@@ -87,7 +89,7 @@ class SessionService:
             query = query.join(SessionTagLink).join(Tag).where(Tag.name == tag)
         sessions = self.db.exec(query).all()
         for s in sessions:
-            _ = s.tags  # load tags into memory before session closes
+            _ = s.tags  # load tags into memory before the DB session closes
         return sessions
 
     def _get_owned_session(self, session_id: int, user_id: int) -> PomodoroSession:
@@ -101,7 +103,7 @@ class SessionService:
     def get(self, session_id: int, user_id: int) -> PomodoroSession:
         """Fetch a single session by ID. Raises 404 if it does not exist or belong to the user."""
         session = self._get_owned_session(session_id, user_id)
-        _ = session.tags  # load tags into memory before session closes
+        _ = session.tags  # load tags into memory before the DB session closes
         return session
 
     def update(self, session_id: int, data: PomodoroSessionUpdate, user_id: int) -> PomodoroSession:
@@ -111,14 +113,14 @@ class SessionService:
 
         if data.status is not None:
             if data.status == SessionStatus.paused and session.status == SessionStatus.in_progress:
-                # Record when the pause started
+                # Record when the pause started so we can measure its length when the user resumes.
                 session.paused_at = now
 
             elif data.status == SessionStatus.in_progress and session.status == SessionStatus.paused:
                 self._accumulate_pause_time(session, now)
 
             elif data.status == SessionStatus.completed:
-                # Accumulate any current pause, then compute actual elapsed work time
+                # Accumulate any current pause, then compute actual elapsed work time.
                 self._accumulate_pause_time(session, now)
                 elapsed_seconds = int((now - session.started_at).total_seconds()) - session.total_paused_seconds
                 session.duration_minutes = self._elapsed_to_minutes(elapsed_seconds)
@@ -131,14 +133,14 @@ class SessionService:
         self.db.add(session)
         self.db.commit()
         self.db.refresh(session)
-        _ = session.tags  # load tags into memory before session closes
+        _ = session.tags  # load tags into memory before the DB session closes
         logger.info("Session %d updated by user %d", session_id, user_id)
         return session
 
     def delete(self, session_id: int, user_id: int) -> None:
         """Delete a session and its tag links. Raises 404 if it does not exist or belong to the user."""
         session = self._get_owned_session(session_id, user_id)
-        # Remove link table rows first so orphaned tags don't linger in the filter bar
+        # Remove link table rows first so orphaned tags don't linger in the filter bar.
         links = self.db.exec(select(SessionTagLink).where(SessionTagLink.session_id == session_id)).all()
         for link in links:
             self.db.delete(link)
