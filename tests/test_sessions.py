@@ -7,6 +7,13 @@ from app.db.schema import engine, PomodoroSession
 
 # --- Basic CRUD ---
 
+def test_session_id_not_found(auth_client):
+    session_id = auth_client.post("/sessions", json={"duration_minutes": 25}).json()["id"]
+    auth_client.delete(f"/sessions/{session_id}")
+
+    response = auth_client.get(f"/sessions/{session_id}")
+    assert response.status_code == 404
+
 def test_create_session_returns_correct_data(auth_client):
     response = auth_client.post("/sessions", json={"duration_minutes": 25})
 
