@@ -1,7 +1,14 @@
 venv/
-__pycache__/
-*.pyc
+**/__pycache__/
+**/*.pyc
 .env
+.env.test
 .git/
+.gitignore
 .vscode/
 frontend/node_modules/
+frontend/.cache/
+tests/
+pytest.ini
+*.md
+Makefile

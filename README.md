@@ -1,24 +1,27 @@
 # Seshlog - Pomdoro Style Work Session Tracker
 
-Pomodoro timer with a RESTful FastAPI and PostgreSQL backend. Sessions have a many-to-many relationship with tags, and the API tracks work sessions, statistics, and history per user with JWT authentication. You can start sessions, tag them by topic, pause and resume them, filter your history by tag, and view all-time totals alongside a 30-day activity chart. A TypeScript frontend ties it all together.
+Pomodoro timer with a RESTful FastAPI and PostgreSQL backend. Sessions have a many-to-many relationship with tags, and the API tracks work sessions, statistics, and history per user with JWT authentication. You can start sessions, tag them by topic, pause and resume them, filter your history by tag, and view all-time totals alongside a 30-day activity chart. A TypeScript frontend ties it all together. The backend is covered by pytest integration tests that run against a real test database.
 
 ## Features
 
-- User registration, login, and logout
-- Each user can only access their own sessions
-- Create, update, and delete work sessions
-- Assign multiple tags to a session (many-to-many)
-- Filter session history by tag
-- Statistics: all-time totals (sessions, minutes, average) and a 30-day activity chart, both filterable by tag
-- Session statuses: `in_progress`, `paused`, `completed`
-- Pause duration tracking (`paused_at`, `total_paused_seconds`)
+### Sessions
+
+- Create, pause, resume, and complete work sessions
+- Assign multiple tags to a session and filter history by tag
+- All-time totals and a 30-day activity chart, both filterable by tag
+- Expired sessions are auto-completed when the next request comes in
+
+### Timer
+
 - Countdown timer with an animated SVG progress ring
 - Active session is restored when the page is reloaded
-- Timer stays accurate when switching tabs (corrects on visibility change, auto-completes if it expired while hidden)
-- Browser notification when the timer completes
-- Rate limiting on all endpoints
-- Input validation on all endpoints (length limits, allowed characters, value ranges)
-- Security headers middleware
+- Timer corrects itself when switching tabs and auto-completes if it ran out while the tab was hidden
+- Browser notification when the timer finishes
+
+### Backend
+
+- Cookie-based JWT authentication; each user can only access their own data
+- Rate limiting, input validation, and security headers on all endpoints
 - Auto-generated interactive API docs at `/docs`
 - Containerised with Docker Compose (backend + PostgreSQL)
 
@@ -33,6 +36,7 @@ Pomodoro timer with a RESTful FastAPI and PostgreSQL backend. Sessions have a ma
 | Auth             | JWT (python-jose) + bcrypt     |
 | Rate limiting    | slowapi                        |
 | Frontend         | TypeScript                     |
+| Testing          | pytest + FastAPI TestClient    |
 | Containerisation | Docker + Docker Compose        |
 
 ## API overview
@@ -47,7 +51,7 @@ Pomodoro timer with a RESTful FastAPI and PostgreSQL backend. Sessions have a ma
 
 Authentication is cookie-based. After login or register, the server sets an HttpOnly cookie (`access_token`) that is sent automatically with subsequent requests.
 
-### Sessions
+### Session endpoints
 
 | Method   | Endpoint         | Description                                 |
 | -------- | ---------------- | ------------------------------------------- |
@@ -123,9 +127,17 @@ pomodoro-app/
 │   │   └── styles.css          # demo UI styles
 │   ├── package.json
 │   └── tsconfig.json
+├── tests/
+│   ├── conftest.py             # fixtures and test database setup
+│   ├── test_auth.py            # auth endpoint tests
+│   ├── test_sessions.py        # session endpoint tests
+│   ├── test_statistics.py      # statistics endpoint tests
+│   └── test_tags.py            # tags endpoint tests
 ├── scripts/
 │   └── seed_demo.py            # creates the demo account and populates it with sample sessions
 ├── .env                        # local environment variables (not committed)
+├── .env.test                   # test database config (not committed)
+├── pytest.ini                  # pytest configuration
 ├── requirements.txt
 ├── Dockerfile                  # builds the backend image
 ├── docker-compose.yml          # defines the backend and database services
@@ -215,6 +227,49 @@ uvicorn app.main:app --reload
 ```
 
 The API runs at `http://localhost:8000` and the interactive docs are at `http://localhost:8000/docs`.
+
+## Testing
+
+The test suite uses pytest and FastAPI's `TestClient`. Tests run against a real PostgreSQL database that gets wiped and recreated before each test, so they never touch your development data.
+
+### Set up a test database
+
+```bash
+sudo -u postgres psql
+```
+
+```sql
+CREATE DATABASE pomodoro_test OWNER your_user;
+\q
+```
+
+### Configure the test environment
+
+Create a `.env.test` file in the project root pointing at the test database:
+
+```env
+DB_USER=your_user
+DB_PASSWORD=your_password
+DB_NAME=pomodoro_test
+SECRET_KEY=any-secret-key
+APP_ENV=development
+RATELIMIT_ENABLED=false
+```
+
+### Run the tests
+
+```bash
+pytest
+```
+
+### What's covered
+
+| File                 | What it tests                                                                                                     |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `test_auth.py`       | Registering, logging in, logging out, tokens                                                                      |
+| `test_sessions.py`   | Creating, editing, and deleting sessions; pausing and resuming; users can't see each other's data (authorization) |
+| `test_statistics.py` | Totals and tag filtering; users only see their own stats                                                          |
+| `test_tags.py`       | Tag listing and cleanup when a session is deleted                                                                 |
 
 ## Demo account
 

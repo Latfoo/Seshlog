@@ -1,4 +1,6 @@
 bcrypt==5.0.0
+httpx
+pytest
 fastapi==0.136.1
 psycopg2-binary==2.9.12
 pydantic==2.13.4
