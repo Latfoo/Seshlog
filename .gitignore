@@ -8,3 +8,4 @@ __pycache__/
 notes.md
 Makefile
 .env.test
+.coverage
