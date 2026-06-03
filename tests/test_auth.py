@@ -49,7 +49,8 @@ def test_accessing_protected_endpoint_without_login_returns_401(client):
 
 
 def test_tampered_token_returns_401(client):
-    response = client.get("/sessions", cookies={"access_token": "not.a.valid.jwt"})
+    client.cookies.set("access_token", "not.a.valid.jwt")
+    response = client.get("/sessions")
 
     assert response.status_code == 401
 
