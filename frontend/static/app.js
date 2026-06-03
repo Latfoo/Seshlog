@@ -1,6 +1,8 @@
 // =============================================================================
 // API Helpers
 // =============================================================================
+// fetchJson is the main wrapper around fetch. It handles auth errors globally:
+// any 401 response automatically transitions the UI to the guest state.
 async function fetchJson(url, method = "GET", body) {
     const headers = { "Content-Type": "application/json" };
     const options = { method, headers, credentials: "include" };
@@ -52,6 +54,7 @@ async function apiCreateSession(durationMinutes, tags) {
         tags: tags,
     });
 }
+// Build a URL with an optional ?tag= query string for filtered API requests.
 function filteredUrl(path, filterTag) {
     return filterTag ? `${path}?tag=${encodeURIComponent(filterTag)}` : path;
 }
@@ -74,13 +77,13 @@ async function apiGetStatistics(filterTag) {
 // State
 // =============================================================================
 let isLoggedIn = false;
-let activeSession = null;
-let timerIntervalId = null;
+let activeSession = null; // the session currently running, or null
+let timerIntervalId = null; // ID returned by setInterval, used to cancel the tick
 let remainingSeconds = 0;
 let totalSeconds = 0;
-let pendingTags = []; // tags typed into the tag input, not yet saved
-let activeTagFilter = ""; // the tag filter currently selected in history
-// Circumference of the SVG ring (radius = 80)
+let pendingTags = []; // tags typed into the tag input, not yet saved to the server
+let activeTagFilter = ""; // the tag filter currently selected in the history section
+// Circumference of the SVG ring (radius = 80). Used to compute strokeDashoffset.
 const RING_CIRCUMFERENCE = 2 * Math.PI * 80;
 // =============================================================================
 // DOM Elements
@@ -95,7 +98,7 @@ const btnPause = document.getElementById("btn-pause");
 const btnDone = document.getElementById("btn-done");
 const sessionsEl = document.getElementById("sessions");
 const filtersEl = document.getElementById("filters");
-// -- Auth modal --
+// Auth modal elements
 const authModal = document.getElementById("auth-modal");
 const authForm = document.getElementById("auth-form");
 const authUserInput = document.getElementById("auth-username");
@@ -108,8 +111,10 @@ const headerUser = document.getElementById("header-user");
 const headerUname = document.getElementById("header-username");
 const btnLogout = document.getElementById("btn-logout");
 const btnLoginHeader = document.getElementById("btn-login-header");
+const headerGuest = document.getElementById("header-guest");
 const savePromptEl = document.getElementById("save-prompt");
 const savePromptLogin = document.getElementById("save-prompt-login");
+const btnDemoLogin = document.getElementById("btn-demo-login");
 // =============================================================================
 // Auth Modal
 // =============================================================================
@@ -131,12 +136,13 @@ function showAuthModal() {
 }
 function hideAuthModal(username) {
     authModal.hidden = true;
-    btnLoginHeader.hidden = true;
+    headerGuest.hidden = true;
     headerUser.hidden = false;
     headerUname.textContent = username;
 }
+// Called when the user is not logged in. Hides all user-specific content.
 function showGuestState() {
-    btnLoginHeader.hidden = false;
+    headerGuest.hidden = false;
     headerUser.hidden = true;
     authError.textContent = "";
     authUserInput.value = "";
@@ -145,6 +151,7 @@ function showGuestState() {
         resetTimerUI();
     showHistoryPlaceholder();
 }
+// Clears the history and stats sections when there is no logged-in user.
 function showHistoryPlaceholder() {
     sessionsEl.innerHTML = `<p class="empty">Log in to see your session history.</p>`;
     filtersEl.innerHTML = "";
@@ -153,6 +160,7 @@ function showHistoryPlaceholder() {
     document.getElementById("stat-avg-minutes").textContent = "—";
     document.getElementById("stats-chart").innerHTML = "";
 }
+// Shows the "save your session" prompt that appears after a guest user finishes a timer.
 function showSavePrompt() {
     savePromptEl.hidden = false;
 }
@@ -206,9 +214,33 @@ btnLogout.addEventListener("click", async () => {
         resetTimerUI();
     showGuestState();
 });
+btnDemoLogin.addEventListener("click", async () => {
+    authMode = "login";
+    tabLogin.classList.add("active");
+    tabRegister.classList.remove("active");
+    authSubmit.textContent = "Log In";
+    authError.textContent = "";
+    btnDemoLogin.disabled = true;
+    authSubmit.disabled = true;
+    try {
+        await apiLogin("demo@example.com", "demo1234");
+        isLoggedIn = true;
+        saveUsername("demo@example.com");
+        hideAuthModal("demo@example.com");
+        await reloadHistory();
+    }
+    catch (err) {
+        authError.textContent = err.message ?? "Demo login failed";
+    }
+    finally {
+        btnDemoLogin.disabled = false;
+        authSubmit.disabled = false;
+    }
+});
 // =============================================================================
 // Timer
 // =============================================================================
+// Show or hide the correct buttons depending on whether a timer is running.
 function setTimerActive(active) {
     durationSel.disabled = active;
     tagInput.disabled = active;
@@ -216,13 +248,15 @@ function setTimerActive(active) {
     btnPause.hidden = !active;
     btnDone.hidden = !active;
 }
-// The server sends naive UTC datetimes without a timezone suffix.
-// Without 'Z', browsers parse them as local time instead of UTC, which breaks
-// computeRemainingSeconds for anyone whose browser timezone differs from the server.
+// The server stores datetimes in UTC without a timezone suffix.
+// Without 'Z', browsers parse them as local time, which breaks remaining-time
+// calculations for users in a different timezone than the server.
 function parseServerTime(isoString) {
     const s = (isoString.endsWith('Z') || isoString.includes('+')) ? isoString : isoString + 'Z';
     return new Date(s).getTime();
 }
+// Calculate how many seconds are left on the timer based on wall-clock time.
+// This is used to resync the display after the tab was hidden or the page was refreshed.
 function computeRemainingSeconds(session) {
     const startedMs = parseServerTime(session.started_at);
     const nowMs = Date.now();
@@ -234,6 +268,7 @@ function computeRemainingSeconds(session) {
     const targetMs = session.duration_minutes * 60 * 1000;
     return Math.max(0, Math.round((targetMs - activeElapsedMs) / 1000));
 }
+// On page load, check if the user already has an active session and resume it.
 async function restoreActiveSession() {
     const sessions = await apiListSessions();
     const active = sessions.find(s => s.status === "in_progress" || s.status === "paused");
@@ -262,7 +297,7 @@ function formatTime(seconds) {
     return `${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
 }
 function updateRing(remaining, total) {
-    // offset 0 = full ring, offset CIRCUMFERENCE = empty ring
+    // offset 0 means full ring, offset CIRCUMFERENCE means empty ring
     const offset = RING_CIRCUMFERENCE * (1 - remaining / total);
     ringEl.style.strokeDashoffset = String(offset);
 }
@@ -287,6 +322,7 @@ function startTicking() {
             finally {
                 resetTimerUI();
             }
+            // Prompt guests to log in so they can save future sessions.
             if (wasGuestSession)
                 showSavePrompt();
         }
@@ -297,6 +333,7 @@ function notify() {
         new Notification("Pomodoro complete!", { body: "Time to take a break." });
     }
 }
+// Stop the timer and reset all state and UI back to the initial state.
 function resetTimerUI() {
     if (timerIntervalId !== null) {
         clearInterval(timerIntervalId);
@@ -317,6 +354,7 @@ function resetTimerUI() {
 // =============================================================================
 // Tag Chip UI
 // =============================================================================
+// Re-render the tag chips from the pendingTags array.
 function renderChips() {
     chipsEl.innerHTML = "";
     for (const tag of pendingTags) {
@@ -334,7 +372,7 @@ function renderChips() {
         chipsEl.appendChild(chip);
     }
 }
-// Press Enter or comma to add a tag
+// Press Enter or comma to confirm a tag. Backspace on empty input removes the last tag.
 tagInput.addEventListener("keydown", (event) => {
     if (event.key === "Enter" || event.key === ",") {
         event.preventDefault();
@@ -350,7 +388,7 @@ tagInput.addEventListener("keydown", (event) => {
         renderChips();
     }
 });
-// Clicking anywhere in the tag box should focus the input
+// Clicking anywhere in the tag box should focus the hidden input.
 document.getElementById("tags-wrap").addEventListener("click", () => tagInput.focus());
 // =============================================================================
 // Timer Buttons
@@ -362,6 +400,7 @@ btnStart.addEventListener("click", async () => {
         totalSeconds = durationMinutes * 60;
         remainingSeconds = totalSeconds;
         if (isLoggedIn) {
+            // Create a session on the server. The server echoes back the confirmed duration.
             activeSession = await apiCreateSession(durationMinutes, pendingTags);
             totalSeconds = activeSession.duration_minutes * 60;
             remainingSeconds = totalSeconds;
@@ -384,7 +423,7 @@ btnStart.addEventListener("click", async () => {
 });
 btnPause.addEventListener("click", async () => {
     if (timerIntervalId !== null) {
-        // currently running, pause it
+        // Timer is running, pause it.
         clearInterval(timerIntervalId);
         timerIntervalId = null;
         ringEl.classList.add("paused");
@@ -395,7 +434,7 @@ btnPause.addEventListener("click", async () => {
         }
     }
     else {
-        // currently paused, resume it
+        // Timer is paused, resume it.
         ringEl.classList.remove("paused");
         btnPause.textContent = "Pause";
         startTicking();
@@ -416,11 +455,14 @@ btnDone.addEventListener("click", async () => {
     }
     resetTimerUI();
 });
+// Update the timer display when the user picks a new duration while no session is active.
 durationSel.addEventListener("change", () => {
     if (activeSession === null) {
         timerTimeEl.textContent = formatTime(Number(durationSel.value) * 60);
     }
 });
+// When the tab becomes visible again, resync remaining time from the server timestamps
+// in case the timer ticked down while the tab was hidden or asleep.
 document.addEventListener("visibilitychange", async () => {
     if (document.visibilityState === "visible" && activeSession !== null) {
         remainingSeconds = computeRemainingSeconds(activeSession);
@@ -444,6 +486,7 @@ document.addEventListener("visibilitychange", async () => {
 // =============================================================================
 // Session History
 // =============================================================================
+// Prevent user-supplied tag names from being interpreted as HTML.
 function escapeHtml(text) {
     return text
         .replace(/&/g, "&amp;")
@@ -514,6 +557,7 @@ function renderFilters(tags) {
         filtersEl.appendChild(makeFilterButton(tag.name, tag.name));
     }
 }
+// Round up to the next "nice" value for the chart's Y axis max.
 function niceMax(n) {
     for (const s of [10, 20, 30, 45, 60, 90, 120, 180, 240, 360]) {
         if (n <= s)
@@ -536,13 +580,13 @@ function renderStatistics(stats) {
     const gap = 2;
     const leftMargin = 38;
     const svgWidth = 638; // must match the viewBox width in index.html
-    const baseY = topPad + chartH; // 68 — chart baseline
-    const labelY = baseY + 14; // 82 — date text baseline
+    const baseY = topPad + chartH; // 68, the chart baseline
+    const labelY = baseY + 14; // 82, where date labels go
     const maxMins = Math.max(...stats.daily.map(d => d.minutes), 1);
     const scaleMax = niceMax(maxMins);
     const now = new Date();
     const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-    // Gridlines and Y-axis labels at half and full scale
+    // Draw gridlines and Y axis labels at 50% and 100% of the scale.
     for (const tick of [Math.round(scaleMax / 2), scaleMax]) {
         const gy = baseY - Math.round((tick / scaleMax) * chartH);
         const line = document.createElementNS(svgNS, "line");
@@ -561,63 +605,46 @@ function renderStatistics(stats) {
         svg.appendChild(lbl);
     }
     // Baseline
-    const baseLine = document.createElementNS(svgNS, "line");
-    baseLine.setAttribute("x1", String(leftMargin));
-    baseLine.setAttribute("x2", "638");
-    baseLine.setAttribute("y1", String(baseY));
-    baseLine.setAttribute("y2", String(baseY));
-    baseLine.setAttribute("class", "grid-base");
-    svg.appendChild(baseLine);
-    // Bars
-    for (let i = 0; i < stats.daily.length; i++) {
-        const day = stats.daily[i];
+    const baseline = document.createElementNS(svgNS, "line");
+    baseline.setAttribute("x1", String(leftMargin));
+    baseline.setAttribute("x2", String(svgWidth));
+    baseline.setAttribute("y1", String(baseY));
+    baseline.setAttribute("y2", String(baseY));
+    baseline.setAttribute("class", "grid-line");
+    svg.appendChild(baseline);
+    // Draw one bar per day. Days with no sessions get a zero-height bar.
+    stats.daily.forEach((day, i) => {
         const x = leftMargin + i * (barW + gap);
-        const isToday = day.date === todayStr;
-        const barH = day.minutes > 0 ? Math.max(4, Math.round((day.minutes / scaleMax) * chartH)) : 2;
+        const barH = Math.round((day.minutes / scaleMax) * chartH);
         const y = baseY - barH;
-        const rect = document.createElementNS(svgNS, "rect");
-        rect.setAttribute("x", String(x));
-        rect.setAttribute("y", String(y));
-        rect.setAttribute("width", String(barW));
-        rect.setAttribute("height", String(barH));
-        rect.setAttribute("rx", "2");
-        let cls = "sbar";
-        if (day.minutes > 0)
-            cls += isToday ? " today" : " active";
-        else
-            cls += isToday ? " today-empty" : " empty";
-        rect.setAttribute("class", cls);
-        const title = document.createElementNS(svgNS, "title");
-        const dateLabel = new Date(day.date + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" });
-        title.textContent = day.minutes > 0
-            ? `${dateLabel}: ${day.minutes} min (${day.sessions} session${day.sessions !== 1 ? "s" : ""})`
-            : `${dateLabel}: no sessions`;
-        rect.appendChild(title);
-        svg.appendChild(rect);
-        // Minute value above bar when tall enough to have room
-        if (day.minutes > 0 && barH >= 14) {
-            const val = document.createElementNS(svgNS, "text");
-            val.setAttribute("x", String(x + barW / 2));
-            val.setAttribute("y", String(y - 2));
-            val.setAttribute("text-anchor", "middle");
-            val.setAttribute("class", "bar-label");
-            val.textContent = String(day.minutes);
-            svg.appendChild(val);
+        if (barH > 0) {
+            const rect = document.createElementNS(svgNS, "rect");
+            rect.setAttribute("x", String(x));
+            rect.setAttribute("y", String(y));
+            rect.setAttribute("width", String(barW));
+            rect.setAttribute("height", String(barH));
+            rect.setAttribute("class", day.date === todayStr ? "bar today" : "bar");
+            svg.appendChild(rect);
         }
-        // Date labels at start, midpoint, and the actual today bar
-        if (i === 0 || i === 14 || isToday) {
-            const text = document.createElementNS(svgNS, "text");
-            text.setAttribute("x", String(x + barW / 2));
-            text.setAttribute("y", String(labelY));
-            text.setAttribute("text-anchor", i === 0 ? "start" : isToday ? "end" : "middle");
-            text.setAttribute("class", isToday ? "chart-label today-label" : "chart-label");
-            text.textContent = isToday
-                ? "Today"
-                : new Date(day.date + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" });
-            svg.appendChild(text);
+        // Only show a date label on the 1st of each month and today.
+        const d = new Date(day.date + "T00:00:00");
+        const isFirstOfMonth = d.getDate() === 1;
+        const isToday = day.date === todayStr;
+        if (isFirstOfMonth || isToday) {
+            const lbl = document.createElementNS(svgNS, "text");
+            lbl.setAttribute("x", String(x + barW / 2));
+            lbl.setAttribute("y", String(labelY));
+            lbl.setAttribute("text-anchor", "middle");
+            lbl.setAttribute("class", isToday ? "chart-label today-label" : "chart-label");
+            lbl.textContent = isToday ? "today" : d.toLocaleString(undefined, { month: "short", day: "numeric" });
+            svg.appendChild(lbl);
         }
-    }
+    });
 }
+// =============================================================================
+// History Reload
+// =============================================================================
+// Fetch fresh sessions, tags, and statistics from the server and re-render everything.
 async function reloadHistory() {
     const filterArg = activeTagFilter !== "" ? activeTagFilter : undefined;
     const [sessions, tags, stats] = await Promise.all([
@@ -640,7 +667,7 @@ timerTimeEl.textContent = formatTime(Number(durationSel.value) * 60);
     try {
         await reloadHistory();
         isLoggedIn = true;
-        btnLoginHeader.hidden = true;
+        headerGuest.hidden = true;
         headerUser.hidden = false;
         headerUname.textContent = getSavedUsername();
         await restoreActiveSession();

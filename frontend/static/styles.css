@@ -709,6 +709,26 @@ select:disabled { opacity: 0.5; }
 .auth-submit:hover { opacity: 0.82; }
 .auth-submit:disabled { opacity: 0.45; cursor: not-allowed; }
 
+.header-guest {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.header-guest[hidden] { display: none; }
+
+.btn-demo-header {
+  background: var(--accent-light);
+  border: 1.5px solid transparent;
+  border-radius: 100px;
+  padding: 6px 18px;
+  font-size: 0.8rem;
+  font-family: var(--font-body);
+  color: var(--accent);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-demo-header:hover { border-color: var(--accent); }
+
 /* Responsive */
 
 @media (max-width: 900px) {

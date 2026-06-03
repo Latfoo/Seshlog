@@ -130,8 +130,10 @@ const headerUser      = document.getElementById("header-user")       as HTMLElem
 const headerUname     = document.getElementById("header-username")   as HTMLSpanElement;
 const btnLogout       = document.getElementById("btn-logout")        as HTMLButtonElement;
 const btnLoginHeader  = document.getElementById("btn-login-header")  as HTMLButtonElement;
+const headerGuest     = document.getElementById("header-guest")      as HTMLElement;
 const savePromptEl    = document.getElementById("save-prompt")       as HTMLDivElement;
 const savePromptLogin = document.getElementById("save-prompt-login") as HTMLButtonElement;
+const btnDemoLogin    = document.getElementById("btn-demo-login")    as HTMLButtonElement;
 
 // =============================================================================
 // Auth Modal
@@ -158,14 +160,14 @@ function showAuthModal(): void {
 
 function hideAuthModal(username: string): void {
     authModal.hidden = true;
-    btnLoginHeader.hidden = true;
+    headerGuest.hidden = true;
     headerUser.hidden = false;
     headerUname.textContent = username;
 }
 
 // Called when the user is not logged in. Hides all user-specific content.
 function showGuestState(): void {
-    btnLoginHeader.hidden = false;
+    headerGuest.hidden = false;
     headerUser.hidden = true;
     authError.textContent = "";
     authUserInput.value = "";
@@ -239,6 +241,30 @@ btnLogout.addEventListener("click", async () => {
     localStorage.removeItem("username");
     if (activeSession !== null) resetTimerUI();
     showGuestState();
+});
+
+btnDemoLogin.addEventListener("click", async () => {
+    authMode = "login";
+    tabLogin.classList.add("active");
+    tabRegister.classList.remove("active");
+    authSubmit.textContent = "Log In";
+    authError.textContent = "";
+
+    btnDemoLogin.disabled = true;
+    authSubmit.disabled = true;
+
+    try {
+        await apiLogin("demo@example.com", "demo1234");
+        isLoggedIn = true;
+        saveUsername("demo@example.com");
+        hideAuthModal("demo@example.com");
+        await reloadHistory();
+    } catch (err: any) {
+        authError.textContent = err.message ?? "Demo login failed";
+    } finally {
+        btnDemoLogin.disabled = false;
+        authSubmit.disabled = false;
+    }
 });
 
 // =============================================================================
@@ -717,7 +743,7 @@ timerTimeEl.textContent = formatTime(Number(durationSel.value) * 60);
     try {
         await reloadHistory();
         isLoggedIn = true;
-        btnLoginHeader.hidden = true;
+        headerGuest.hidden = true;
         headerUser.hidden = false;
         headerUname.textContent = getSavedUsername();
         await restoreActiveSession();

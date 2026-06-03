@@ -123,6 +123,8 @@ pomodoro-app/
 │   │   └── styles.css          # demo UI styles
 │   ├── package.json
 │   └── tsconfig.json
+├── scripts/
+│   └── seed_demo.py            # creates the demo account and populates it with sample sessions
 ├── .env                        # local environment variables (not committed)
 ├── requirements.txt
 ├── Dockerfile                  # builds the backend image
@@ -213,6 +215,24 @@ uvicorn app.main:app --reload
 ```
 
 The API runs at `http://localhost:8000` and the interactive docs are at `http://localhost:8000/docs`.
+
+## Demo account
+
+A "Try Demo" button in the header logs straight into a pre-populated demo account so anyone visiting the deployed app can explore it without registering.
+
+To set up the demo account, run the seed script once after the database is ready:
+
+```bash
+python scripts/seed_demo.py
+```
+
+This creates the user `demo@example.com` with password `demo1234` and inserts 37 completed sessions spread across the last four weeks, tagged with `coding`, `deep-work`, `studying`, `reading`, and `planning`. The script is idempotent and will skip creation if the account already exists.
+
+On Railway or another platform where you cannot SSH directly, use the Railway CLI to run the script against the production database:
+
+```bash
+railway run python scripts/seed_demo.py
+```
 
 ## Example requests
 
