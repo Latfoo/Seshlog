@@ -139,10 +139,6 @@ class SessionService:
     def delete(self, session_id: int, user_id: int) -> None:
         """Delete a session and its tag links. Raises 404 if it does not exist or belong to the user."""
         session = self._get_owned_session(session_id, user_id)
-        # Remove link table rows first so orphaned tags don't linger in the filter bar.
-        links = self.db.exec(select(SessionTagLink).where(SessionTagLink.session_id == session_id)).all()
-        for link in links:
-            self.db.delete(link)
         self.db.delete(session)
         self.db.commit()
         logger.info("Session %d deleted by user %d", session_id, user_id)
