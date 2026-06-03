@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import HTTPException
 from sqlmodel import Session, select
 
@@ -59,7 +59,7 @@ class SessionService:
         This cleans up sessions whose timer expired while the browser tab was closed,
         so they don't stay stuck as 'in_progress' forever.
         """
-        now = datetime.now()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         in_progress = self.db.exec(
             select(PomodoroSession)
             .where(PomodoroSession.user_id == user_id)
@@ -106,7 +106,7 @@ class SessionService:
     def update(self, session_id: int, data: PomodoroSessionUpdate, user_id: int) -> PomodoroSession:
         """Apply partial updates to a session. Raises 404 if it does not exist or belong to the user."""
         session = self._get_owned_session(session_id, user_id)
-        now = datetime.now()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
 
         if data.status is not None:
             if data.status == SessionStatus.paused and session.status == SessionStatus.in_progress:

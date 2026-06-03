@@ -8,8 +8,9 @@ async function fetchJson(url, method = "GET", body) {
         options.body = JSON.stringify(body);
     const response = await fetch(url, options);
     if (response.status === 401) {
-        showAuthModal();
-        throw new Error("Session expired — please log in again");
+        isLoggedIn = false;
+        showGuestState();
+        throw new Error("Not authenticated");
     }
     if (!response.ok)
         throw new Error(`Request failed: ${response.status}`);
@@ -18,7 +19,7 @@ async function fetchJson(url, method = "GET", body) {
     return response.json();
 }
 // Auth API calls use plain fetch (not fetchJson) so a wrong password doesn't
-// trigger the "session expired" redirect that fetchJson does on 401.
+// trigger the guest-state transition that fetchJson does on 401.
 async function getErrorDetail(response) {
     const data = await response.json().catch(() => ({}));
     return data.detail;
@@ -72,6 +73,7 @@ async function apiGetStatistics(filterTag) {
 // =============================================================================
 // State
 // =============================================================================
+let isLoggedIn = false;
 let activeSession = null;
 let timerIntervalId = null;
 let remainingSeconds = 0;
@@ -105,6 +107,9 @@ const tabRegister = document.getElementById("tab-register");
 const headerUser = document.getElementById("header-user");
 const headerUname = document.getElementById("header-username");
 const btnLogout = document.getElementById("btn-logout");
+const btnLoginHeader = document.getElementById("btn-login-header");
+const savePromptEl = document.getElementById("save-prompt");
+const savePromptLogin = document.getElementById("save-prompt-login");
 // =============================================================================
 // Auth Modal
 // =============================================================================
@@ -126,9 +131,33 @@ function showAuthModal() {
 }
 function hideAuthModal(username) {
     authModal.hidden = true;
+    btnLoginHeader.hidden = true;
     headerUser.hidden = false;
     headerUname.textContent = username;
 }
+function showGuestState() {
+    btnLoginHeader.hidden = false;
+    headerUser.hidden = true;
+    authError.textContent = "";
+    authUserInput.value = "";
+    authPassInput.value = "";
+    if (activeSession !== null)
+        resetTimerUI();
+    showHistoryPlaceholder();
+}
+function showHistoryPlaceholder() {
+    sessionsEl.innerHTML = `<p class="empty">Log in to see your session history.</p>`;
+    filtersEl.innerHTML = "";
+    document.getElementById("stat-total-minutes").textContent = "—";
+    document.getElementById("stat-total-sessions").textContent = "—";
+    document.getElementById("stat-avg-minutes").textContent = "—";
+    document.getElementById("stats-chart").innerHTML = "";
+}
+function showSavePrompt() {
+    savePromptEl.hidden = false;
+}
+btnLoginHeader.addEventListener("click", () => showAuthModal());
+savePromptLogin.addEventListener("click", () => showAuthModal());
 tabLogin.addEventListener("click", () => {
     authMode = "login";
     tabLogin.classList.add("active");
@@ -158,6 +187,7 @@ authForm.addEventListener("submit", async (e) => {
         else {
             await apiRegister(email, password);
         }
+        isLoggedIn = true;
         saveUsername(email);
         hideAuthModal(email);
         await reloadHistory();
@@ -172,7 +202,9 @@ authForm.addEventListener("submit", async (e) => {
 btnLogout.addEventListener("click", async () => {
     await fetch("/auth/logout", { method: "POST", credentials: "include" });
     localStorage.removeItem("username");
-    showAuthModal();
+    if (activeSession !== null)
+        resetTimerUI();
+    showGuestState();
 });
 // =============================================================================
 // Timer
@@ -244,16 +276,19 @@ function startTicking() {
         if (remainingSeconds <= 0) {
             clearInterval(timerIntervalId);
             timerIntervalId = null;
+            const wasGuestSession = activeSession === null;
             try {
-                if (activeSession !== null) {
+                if (!wasGuestSession) {
                     await apiUpdateSession(activeSession.id, "completed");
+                    await reloadHistory();
                 }
                 notify();
-                await reloadHistory();
             }
             finally {
                 resetTimerUI();
             }
+            if (wasGuestSession)
+                showSavePrompt();
         }
     }, 1000);
 }
@@ -277,6 +312,7 @@ function resetTimerUI() {
     setTimerActive(false);
     chipsEl.innerHTML = "";
     btnPause.textContent = "Pause";
+    savePromptEl.hidden = true;
 }
 // =============================================================================
 // Tag Chip UI
@@ -322,55 +358,63 @@ document.getElementById("tags-wrap").addEventListener("click", () => tagInput.fo
 btnStart.addEventListener("click", async () => {
     btnStart.disabled = true;
     try {
-        activeSession = await apiCreateSession(Number(durationSel.value), pendingTags);
-        totalSeconds = activeSession.duration_minutes * 60;
+        const durationMinutes = Number(durationSel.value);
+        totalSeconds = durationMinutes * 60;
         remainingSeconds = totalSeconds;
+        if (isLoggedIn) {
+            activeSession = await apiCreateSession(durationMinutes, pendingTags);
+            totalSeconds = activeSession.duration_minutes * 60;
+            remainingSeconds = totalSeconds;
+        }
         ringEl.style.strokeDasharray = String(RING_CIRCUMFERENCE);
         ringEl.style.strokeDashoffset = "0";
         ringEl.classList.remove("paused");
         timerTimeEl.textContent = formatTime(remainingSeconds);
         startTicking();
         setTimerActive(true);
-        await reloadHistory();
+        if (isLoggedIn)
+            await reloadHistory();
     }
     catch (error) {
         console.error(error);
-        alert("Could not start session — is the server running?");
     }
     finally {
         btnStart.disabled = false;
     }
 });
 btnPause.addEventListener("click", async () => {
-    if (activeSession === null)
-        return;
     if (timerIntervalId !== null) {
         // currently running, pause it
         clearInterval(timerIntervalId);
         timerIntervalId = null;
         ringEl.classList.add("paused");
         btnPause.textContent = "Resume";
-        await apiUpdateSession(activeSession.id, "paused");
+        if (activeSession !== null) {
+            await apiUpdateSession(activeSession.id, "paused");
+            await reloadHistory();
+        }
     }
     else {
         // currently paused, resume it
         ringEl.classList.remove("paused");
         btnPause.textContent = "Pause";
         startTicking();
-        await apiUpdateSession(activeSession.id, "in_progress");
+        if (activeSession !== null) {
+            await apiUpdateSession(activeSession.id, "in_progress");
+            await reloadHistory();
+        }
     }
-    await reloadHistory();
 });
 btnDone.addEventListener("click", async () => {
     if (timerIntervalId !== null) {
         clearInterval(timerIntervalId);
         timerIntervalId = null;
     }
-    if (activeSession === null)
-        return;
-    await apiUpdateSession(activeSession.id, "completed");
+    if (activeSession !== null) {
+        await apiUpdateSession(activeSession.id, "completed");
+        await reloadHistory();
+    }
     resetTimerUI();
-    await reloadHistory();
 });
 durationSel.addEventListener("change", () => {
     if (activeSession === null) {
@@ -383,10 +427,14 @@ document.addEventListener("visibilitychange", async () => {
         if (remainingSeconds <= 0) {
             clearInterval(timerIntervalId);
             timerIntervalId = null;
-            await apiUpdateSession(activeSession.id, "completed");
-            notify();
-            await reloadHistory();
-            resetTimerUI();
+            try {
+                await apiUpdateSession(activeSession.id, "completed");
+                notify();
+                await reloadHistory();
+            }
+            finally {
+                resetTimerUI();
+            }
             return;
         }
         timerTimeEl.textContent = formatTime(remainingSeconds);
@@ -591,11 +639,14 @@ timerTimeEl.textContent = formatTime(Number(durationSel.value) * 60);
 (async () => {
     try {
         await reloadHistory();
-        hideAuthModal(getSavedUsername());
+        isLoggedIn = true;
+        btnLoginHeader.hidden = true;
+        headerUser.hidden = false;
+        headerUname.textContent = getSavedUsername();
         await restoreActiveSession();
     }
     catch {
-        // 401 is already handled inside fetchJson (calls showAuthModal)
+        // fetchJson already called showGuestState() on 401
     }
 })();
 export {};

@@ -539,13 +539,15 @@ select:disabled { opacity: 0.5; }
   align-items: center;
   gap: 12px;
 }
+.header-user[hidden] { display: none; }
 
 .header-username {
   font-size: 0.84rem;
   color: var(--muted);
 }
 
-.btn-logout {
+.btn-logout,
+.btn-login {
   background: none;
   border: 1.5px solid var(--border);
   border-radius: 100px;
@@ -556,7 +558,32 @@ select:disabled { opacity: 0.5; }
   cursor: pointer;
   transition: all 0.15s;
 }
-.btn-logout:hover { border-color: var(--accent); color: var(--accent); }
+.btn-logout:hover,
+.btn-login:hover { border-color: var(--accent); color: var(--accent); }
+
+/* Save prompt (shown after guest session completes) */
+
+.save-prompt {
+  font-size: 0.84rem;
+  color: var(--muted);
+  background: var(--sand);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 16px;
+}
+
+.save-prompt-login {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: inherit;
+  font-family: inherit;
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.save-prompt-login:hover { color: var(--accent-dark); }
 
 /* Auth modal */
 

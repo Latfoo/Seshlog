@@ -13,8 +13,9 @@ async function fetchJson(url: string, method = "GET", body?: object): Promise<an
     const response = await fetch(url, options);
 
     if (response.status === 401) {
-        showAuthModal();
-        throw new Error("Session expired — please log in again");
+        isLoggedIn = false;
+        showGuestState();
+        throw new Error("Not authenticated");
     }
 
     if (!response.ok) throw new Error(`Request failed: ${response.status}`);
@@ -23,7 +24,7 @@ async function fetchJson(url: string, method = "GET", body?: object): Promise<an
 }
 
 // Auth API calls use plain fetch (not fetchJson) so a wrong password doesn't
-// trigger the "session expired" redirect that fetchJson does on 401.
+// trigger the guest-state transition that fetchJson does on 401.
 
 async function getErrorDetail(response: Response): Promise<string | undefined> {
     const data = await response.json().catch(() => ({}));
@@ -88,6 +89,7 @@ async function apiGetStatistics(filterTag?: string): Promise<Statistics> {
 // =============================================================================
 // State
 // =============================================================================
+let isLoggedIn = false;
 let activeSession: Session | null = null;
 let timerIntervalId: number | null = null;
 let remainingSeconds = 0;
@@ -121,9 +123,12 @@ const authError     = document.getElementById("auth-error")      as HTMLParagrap
 const authSubmit    = document.getElementById("auth-submit")     as HTMLButtonElement;
 const tabLogin      = document.getElementById("tab-login")       as HTMLButtonElement;
 const tabRegister   = document.getElementById("tab-register")    as HTMLButtonElement;
-const headerUser    = document.getElementById("header-user")     as HTMLElement;
-const headerUname   = document.getElementById("header-username") as HTMLSpanElement;
-const btnLogout     = document.getElementById("btn-logout")      as HTMLButtonElement;
+const headerUser      = document.getElementById("header-user")       as HTMLElement;
+const headerUname     = document.getElementById("header-username")   as HTMLSpanElement;
+const btnLogout       = document.getElementById("btn-logout")        as HTMLButtonElement;
+const btnLoginHeader  = document.getElementById("btn-login-header")  as HTMLButtonElement;
+const savePromptEl    = document.getElementById("save-prompt")       as HTMLDivElement;
+const savePromptLogin = document.getElementById("save-prompt-login") as HTMLButtonElement;
 
 // =============================================================================
 // Auth Modal
@@ -150,9 +155,36 @@ function showAuthModal(): void {
 
 function hideAuthModal(username: string): void {
     authModal.hidden = true;
+    btnLoginHeader.hidden = true;
     headerUser.hidden = false;
     headerUname.textContent = username;
 }
+
+function showGuestState(): void {
+    btnLoginHeader.hidden = false;
+    headerUser.hidden = true;
+    authError.textContent = "";
+    authUserInput.value = "";
+    authPassInput.value = "";
+    if (activeSession !== null) resetTimerUI();
+    showHistoryPlaceholder();
+}
+
+function showHistoryPlaceholder(): void {
+    sessionsEl.innerHTML = `<p class="empty">Log in to see your session history.</p>`;
+    filtersEl.innerHTML = "";
+    (document.getElementById("stat-total-minutes") as HTMLElement).textContent = "—";
+    (document.getElementById("stat-total-sessions") as HTMLElement).textContent = "—";
+    (document.getElementById("stat-avg-minutes") as HTMLElement).textContent = "—";
+    (document.getElementById("stats-chart") as Element).innerHTML = "";
+}
+
+function showSavePrompt(): void {
+    savePromptEl.hidden = false;
+}
+
+btnLoginHeader.addEventListener("click", () => showAuthModal());
+savePromptLogin.addEventListener("click", () => showAuthModal());
 
 tabLogin.addEventListener("click", () => {
     authMode = "login";
@@ -185,6 +217,7 @@ authForm.addEventListener("submit", async (e) => {
         } else {
             await apiRegister(email, password);
         }
+        isLoggedIn = true;
         saveUsername(email);
         hideAuthModal(email);
         await reloadHistory();
@@ -198,7 +231,8 @@ authForm.addEventListener("submit", async (e) => {
 btnLogout.addEventListener("click", async () => {
     await fetch("/auth/logout", { method: "POST", credentials: "include" });
     localStorage.removeItem("username");
-    showAuthModal();
+    if (activeSession !== null) resetTimerUI();
+    showGuestState();
 });
 
 // =============================================================================
@@ -279,15 +313,17 @@ function startTicking(): void {
         if (remainingSeconds <= 0) {
             clearInterval(timerIntervalId!);
             timerIntervalId = null;
+            const wasGuestSession = activeSession === null;
             try {
-                if (activeSession !== null) {
-                    await apiUpdateSession(activeSession.id, "completed");
+                if (!wasGuestSession) {
+                    await apiUpdateSession(activeSession!.id, "completed");
+                    await reloadHistory();
                 }
                 notify();
-                await reloadHistory();
             } finally {
                 resetTimerUI();
             }
+            if (wasGuestSession) showSavePrompt();
         }
     }, 1000);
 }
@@ -313,6 +349,7 @@ function resetTimerUI(): void {
     setTimerActive(false);
     chipsEl.innerHTML = "";
     btnPause.textContent = "Pause";
+    savePromptEl.hidden = true;
 }
 
 // =============================================================================
@@ -363,41 +400,51 @@ document.getElementById("tags-wrap")!.addEventListener("click", () => tagInput.f
 btnStart.addEventListener("click", async () => {
     btnStart.disabled = true;
     try {
-        activeSession = await apiCreateSession(Number(durationSel.value), pendingTags);
-        totalSeconds = activeSession.duration_minutes * 60;
+        const durationMinutes = Number(durationSel.value);
+        totalSeconds = durationMinutes * 60;
         remainingSeconds = totalSeconds;
+
+        if (isLoggedIn) {
+            activeSession = await apiCreateSession(durationMinutes, pendingTags);
+            totalSeconds = activeSession.duration_minutes * 60;
+            remainingSeconds = totalSeconds;
+        }
+
         ringEl.style.strokeDasharray = String(RING_CIRCUMFERENCE);
         ringEl.style.strokeDashoffset = "0";
         ringEl.classList.remove("paused");
         timerTimeEl.textContent = formatTime(remainingSeconds);
         startTicking();
         setTimerActive(true);
-        await reloadHistory();
+        if (isLoggedIn) await reloadHistory();
     } catch (error) {
         console.error(error);
-        alert("Could not start session — is the server running?");
     } finally {
         btnStart.disabled = false;
     }
 });
 
 btnPause.addEventListener("click", async () => {
-    if (activeSession === null) return;
     if (timerIntervalId !== null) {
         // currently running, pause it
         clearInterval(timerIntervalId);
         timerIntervalId = null;
         ringEl.classList.add("paused");
         btnPause.textContent = "Resume";
-        await apiUpdateSession(activeSession.id, "paused");
+        if (activeSession !== null) {
+            await apiUpdateSession(activeSession.id, "paused");
+            await reloadHistory();
+        }
     } else {
         // currently paused, resume it
         ringEl.classList.remove("paused");
         btnPause.textContent = "Pause";
         startTicking();
-        await apiUpdateSession(activeSession.id, "in_progress");
+        if (activeSession !== null) {
+            await apiUpdateSession(activeSession.id, "in_progress");
+            await reloadHistory();
+        }
     }
-    await reloadHistory();
 });
 
 btnDone.addEventListener("click", async () => {
@@ -405,10 +452,11 @@ btnDone.addEventListener("click", async () => {
         clearInterval(timerIntervalId);
         timerIntervalId = null;
     }
-    if (activeSession === null) return;
-    await apiUpdateSession(activeSession.id, "completed");
+    if (activeSession !== null) {
+        await apiUpdateSession(activeSession.id, "completed");
+        await reloadHistory();
+    }
     resetTimerUI();
-    await reloadHistory();
 });
 
 durationSel.addEventListener("change", () => {
@@ -423,10 +471,13 @@ document.addEventListener("visibilitychange", async () => {
         if (remainingSeconds <= 0) {
             clearInterval(timerIntervalId!);
             timerIntervalId = null;
-            await apiUpdateSession(activeSession.id, "completed");
-            notify();
-            await reloadHistory();
-            resetTimerUI();
+            try {
+                await apiUpdateSession(activeSession.id, "completed");
+                notify();
+                await reloadHistory();
+            } finally {
+                resetTimerUI();
+            }
             return;
         }
         timerTimeEl.textContent = formatTime(remainingSeconds);
@@ -663,9 +714,12 @@ timerTimeEl.textContent = formatTime(Number(durationSel.value) * 60);
 (async () => {
     try {
         await reloadHistory();
-        hideAuthModal(getSavedUsername());
+        isLoggedIn = true;
+        btnLoginHeader.hidden = true;
+        headerUser.hidden = false;
+        headerUname.textContent = getSavedUsername();
         await restoreActiveSession();
     } catch {
-        // 401 is already handled inside fetchJson (calls showAuthModal)
+        // fetchJson already called showGuestState() on 401
     }
 })();

@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, create_engine, Field, Relationship
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.core.config import config
 from app.models.session import SessionStatus
@@ -28,7 +28,7 @@ class PomodoroSession(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="usertable.id", index= True)
     duration_minutes: int
-    started_at: datetime = Field(default_factory=datetime.now)
+    started_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     status: SessionStatus = Field(default=SessionStatus.in_progress)
     paused_at: Optional[datetime] = Field(default=None, nullable=True)
     total_paused_seconds: int = Field(default=0)
