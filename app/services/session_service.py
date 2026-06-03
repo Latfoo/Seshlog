@@ -1,4 +1,5 @@
 import logging
+import math
 from datetime import datetime, timezone
 from fastapi import HTTPException
 from sqlmodel import Session, select
@@ -16,7 +17,7 @@ class SessionService:
         self.db = db
 
     def _elapsed_to_minutes(self, elapsed_seconds: float) -> int:
-        return max(1, int(elapsed_seconds) // 60)
+        return max(1, math.ceil(elapsed_seconds / 60))
 
     def _accumulate_pause_time(self, session: PomodoroSession, now: datetime) -> None:
         if session.paused_at:
