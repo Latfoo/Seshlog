@@ -180,6 +180,12 @@ docker compose up --build
 
 This starts two containers: the FastAPI backend and a PostgreSQL database. The API runs at `http://localhost:8000` and the interactive docs are at `http://localhost:8000/docs`.
 
+To seed the demo account, run once after the containers are up:
+
+```bash
+docker compose exec backend python3 scripts/seed_demo.py
+```
+
 ### Without Docker
 
 Requires Python 3.12+ and PostgreSQL installed locally.
@@ -228,6 +234,12 @@ uvicorn app.main:app --reload
 
 The API runs at `http://localhost:8000` and the interactive docs are at `http://localhost:8000/docs`.
 
+To seed the demo account, run:
+
+```bash
+python3 scripts/seed_demo.py
+```
+
 ## Testing
 
 The test suite uses pytest and FastAPI's `TestClient`. Tests run against a real PostgreSQL database that gets wiped and recreated before each test, so they never touch your development data.
@@ -275,19 +287,13 @@ pytest
 
 A "Try Demo" button in the header logs straight into a pre-populated demo account so anyone visiting the deployed app can explore it without registering.
 
-To set up the demo account, run the seed script once after the database is ready:
+To set up the demo account, run the seed script once after the containers are up:
 
 ```bash
-python scripts/seed_demo.py
+docker compose exec backend python3 scripts/seed_demo.py
 ```
 
 This creates the user `demo@example.com` with password `demo1234` and inserts 37 completed sessions spread across the last four weeks, tagged with `coding`, `deep-work`, `studying`, `reading`, and `planning`. The script is idempotent and will skip creation if the account already exists.
-
-On Railway or another platform where you cannot SSH directly, use the Railway CLI to run the script against the production database:
-
-```bash
-railway run python scripts/seed_demo.py
-```
 
 ## Example requests
 
