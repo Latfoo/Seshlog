@@ -73,7 +73,6 @@ class SessionService:
             elapsed = (now - s.started_at).total_seconds() - s.total_paused_seconds
             if elapsed >= s.duration_minutes * 60:
                 s.status = SessionStatus.completed
-                s.duration_minutes = self._elapsed_to_minutes(elapsed)
                 self.db.add(s)
                 any_changed = True
                 logger.info("Auto-completed expired session %d for user %d", s.id, s.user_id)
