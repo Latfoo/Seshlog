@@ -65,6 +65,16 @@ def test_tags_are_lowercased_and_stripped(auth_client):
     tag_names = [t["name"] for t in response.json()["tags"]]
     assert "work" in tag_names
 
+def test_filter_sessions_by_tag(auth_client):
+    auth_client.post("/sessions", json={"duration_minutes": 25, "tags": ["work"]})
+    auth_client.post("/sessions", json={"duration_minutes": 25, "tags": ["leisure"]})
+
+    sessions = auth_client.get("/sessions?tag=work").json()
+
+    assert len(sessions) == 1 # check if leisure session is excluded
+    assert any(t["name"] == "work" for t in sessions[0]["tags"])
+
+
 
 # --- Authorization ---
 
