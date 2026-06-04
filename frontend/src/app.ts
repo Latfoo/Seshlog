@@ -378,7 +378,7 @@ function startTicking(): void {
 
 function notify(): void {
     if (Notification.permission === "granted") {
-        new Notification("Pomodoro complete!", { body: "Time to take a break." });
+        new Notification("Session complete!", { body: "Time to take a break." });
     }
 }
 
@@ -568,7 +568,7 @@ const STATUS_LABELS: Record<string, string> = {
 
 function renderSessions(sessions: Session[]): void {
     if (sessions.length === 0) {
-        sessionsEl.innerHTML = `<p class="empty">No sessions yet — start your first Pomodoro!</p>`;
+        sessionsEl.innerHTML = `<p class="empty">No sessions yet — start your first session!</p>`;
         return;
     }
 

@@ -342,7 +342,7 @@ function startTicking() {
 }
 function notify() {
     if (Notification.permission === "granted") {
-        new Notification("Pomodoro complete!", { body: "Time to take a break." });
+        new Notification("Session complete!", { body: "Time to take a break." });
     }
 }
 // Stop the timer and reset all state and UI back to the initial state.
@@ -520,7 +520,7 @@ const STATUS_LABELS = {
 };
 function renderSessions(sessions) {
     if (sessions.length === 0) {
-        sessionsEl.innerHTML = `<p class="empty">No sessions yet — start your first Pomodoro!</p>`;
+        sessionsEl.innerHTML = `<p class="empty">No sessions yet — start your first session!</p>`;
         return;
     }
     // Sort newest first

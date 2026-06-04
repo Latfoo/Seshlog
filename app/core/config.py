@@ -7,8 +7,8 @@ load_dotenv()
 
 
 class Config(BaseModel):
-    app_name: str = "Pomodoro Tracker"
-    app_description: str = "Backend for a pomodoro timer with tagging"
+    app_name: str = "Seshlog"
+    app_description: str = "Backend for a focus session tracker with tagging"
     debug: bool = False
     SECRET_KEY: str = os.environ["SECRET_KEY"]          # used to sign JWTs, must be kept secret
     app_env: str = os.getenv("APP_ENV", "production")   # "development" disables secure cookies

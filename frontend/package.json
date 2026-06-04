@@ -1,5 +1,5 @@
 {
-  "name": "pomodoro-frontend",
+  "name": "seshlog-frontend",
   "private": true,
   "scripts": {
     "build": "tsc",

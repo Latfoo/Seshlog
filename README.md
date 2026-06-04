@@ -92,7 +92,7 @@ pomodoro-app/
 ├── app/
 │   ├── api/
 │   │   ├── auth.py             # register, login, and logout endpoints
-│   │   ├── frontend.py         # serves the demo UI
+│   │   ├── frontend.py         # serves the frontend pages (/, /imprint, /privacy)
 │   │   ├── health.py           # health check endpoint
 │   │   ├── sessions.py         # session CRUD endpoints
 │   │   ├── statistics.py       # statistics endpoint
@@ -121,15 +121,18 @@ pomodoro-app/
 │   │   ├── app.ts              # TypeScript source for the demo UI
 │   │   └── types.ts            # shared TypeScript interfaces
 │   ├── static/
-│   │   ├── index.html          # demo UI HTML
+│   │   ├── index.html          # main app page
+│   │   ├── imprint.html        # legal notice page
+│   │   ├── privacy.html        # privacy policy page
 │   │   ├── app.js              # compiled frontend JS
 │   │   ├── types.js            # compiled types
-│   │   └── styles.css          # demo UI styles
+│   │   └── styles.css          # styles
 │   ├── package.json
 │   └── tsconfig.json
 ├── tests/
 │   ├── conftest.py             # fixtures and test database setup
 │   ├── test_auth.py            # auth endpoint tests
+│   ├── test_frontend.py        # frontend route tests
 │   ├── test_sessions.py        # session endpoint tests
 │   ├── test_statistics.py      # statistics endpoint tests
 │   └── test_tags.py            # tags endpoint tests
