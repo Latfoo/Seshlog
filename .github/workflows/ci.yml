@@ -30,6 +30,7 @@ jobs:
       DB_PASSWORD: ${{ secrets.TEST_DB_PASSWORD }}
       DB_NAME: ${{ secrets.TEST_DB_NAME }}
       SECRET_KEY: ${{ secrets.TEST_SECRET_KEY }}
+      APP_ENV: development
 
     steps:
       - uses: actions/checkout@v4
