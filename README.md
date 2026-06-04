@@ -26,6 +26,7 @@ Containerrised with Docker and deployed via Railway with a basic CI/CD setup in 
 ### Backend
 
 - Cookie-based JWT authentication; each user can only access their own data
+- Account deletion removes the user and all their sessions; the demo account is protected
 - Rate limiting, input validation, and security headers on all endpoints
 - Auto-generated interactive API docs at `/docs`
 - Containerised with Docker Compose (backend + PostgreSQL)
@@ -56,11 +57,12 @@ Containerrised with Docker and deployed via Railway with a basic CI/CD setup in 
 
 ### Auth
 
-| Method | Endpoint         | Description                                         |
-| ------ | ---------------- | --------------------------------------------------- |
-| `POST` | `/auth/register` | Register a new user, sets an auth cookie            |
-| `POST` | `/auth/login`    | Log in with email and password, sets an auth cookie |
-| `POST` | `/auth/logout`   | Log out, clears the auth cookie                     |
+| Method   | Endpoint         | Description                                                                        |
+| -------- | ---------------- | ---------------------------------------------------------------------------------- |
+| `POST`   | `/auth/register` | Register a new user, sets an auth cookie                                           |
+| `POST`   | `/auth/login`    | Log in with email and password, sets an auth cookie                                |
+| `POST`   | `/auth/logout`   | Log out, clears the auth cookie                                                    |
+| `DELETE` | `/auth/account`  | Delete the authenticated user's account and all their data, clears the auth cookie |
 
 Authentication is cookie-based. After login or register, the server sets an HttpOnly cookie (`access_token`) that is sent automatically with subsequent requests.
 
@@ -294,7 +296,7 @@ pytest
 
 | File                 | What it tests                                                                                                     |
 | -------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `test_auth.py`       | Registering, logging in, logging out, tokens                                                                      |
+| `test_auth.py`       | Registering, logging in, logging out, account deletion, tokens                                                    |
 | `test_sessions.py`   | Creating, editing, and deleting sessions; pausing and resuming; users can't see each other's data (authorization) |
 | `test_statistics.py` | Totals and tag filtering; users only see their own stats                                                          |
 | `test_tags.py`       | Tag listing and cleanup when a session is deleted                                                                 |
@@ -333,6 +335,12 @@ curl -b cookies.txt -X POST http://localhost:8000/sessions \
 
 ```bash
 curl -b cookies.txt http://localhost:8000/sessions?tag=backend
+```
+
+### Delete your account
+
+```bash
+curl -b cookies.txt -X DELETE http://localhost:8000/auth/account
 ```
 
 ### Mark a session as completed
