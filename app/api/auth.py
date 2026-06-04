@@ -2,7 +2,7 @@ from fastapi import APIRouter, Request, Response
 from sqlmodel import Session
 
 from app.db.schema import engine
-from app.models.user import UserCreate
+from app.models.user import UserCreate, UserLogin
 from app.services.auth_service import UserService
 from app.core.config import config
 from app.core.limiter import limiter
@@ -37,7 +37,7 @@ def register(request: Request, new_user: UserCreate, response: Response):
 
 @router.post("/login")
 @limiter.limit("10/minute")
-def login(request: Request, user: UserCreate, response: Response):
+def login(request: Request, user: UserLogin, response: Response):
     with Session(engine) as db:
         token = UserService(db).login_user(user)
     _set_auth_cookie(response, token)

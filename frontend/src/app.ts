@@ -30,7 +30,15 @@ async function fetchJson(url: string, method = "GET", body?: object): Promise<an
 
 async function getErrorDetail(response: Response): Promise<string | undefined> {
     const data = await response.json().catch(() => ({}));
-    return (data as any).detail;
+    const detail = (data as any).detail;
+    if (typeof detail === "string") return detail;
+    // Pydantic validation errors return detail as an array of error objects.
+    if (Array.isArray(detail) && detail.length > 0) {
+        const first = detail[0];
+        const msg: string = first.ctx?.error ?? first.msg ?? "";
+        return msg.replace(/^Value error,\s*/, "") || undefined;
+    }
+    return undefined;
 }
 
 async function apiLogin(email: string, password: string): Promise<void> {
@@ -134,6 +142,7 @@ const headerGuest     = document.getElementById("header-guest")      as HTMLElem
 const savePromptEl    = document.getElementById("save-prompt")       as HTMLDivElement;
 const savePromptLogin = document.getElementById("save-prompt-login") as HTMLButtonElement;
 const btnDemoLogin    = document.getElementById("btn-demo-login")    as HTMLButtonElement;
+const passwordHint    = document.getElementById("password-hint")     as HTMLParagraphElement;
 
 // =============================================================================
 // Auth Modal
@@ -200,6 +209,7 @@ tabLogin.addEventListener("click", () => {
     tabRegister.classList.remove("active");
     authSubmit.textContent = "Log In";
     authError.textContent = "";
+    passwordHint.hidden = true;
 });
 
 tabRegister.addEventListener("click", () => {
@@ -208,6 +218,7 @@ tabRegister.addEventListener("click", () => {
     tabLogin.classList.remove("active");
     authSubmit.textContent = "Register";
     authError.textContent = "";
+    passwordHint.hidden = false;
 });
 
 authForm.addEventListener("submit", async (e) => {

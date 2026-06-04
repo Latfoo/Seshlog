@@ -24,7 +24,16 @@ async function fetchJson(url, method = "GET", body) {
 // trigger the guest-state transition that fetchJson does on 401.
 async function getErrorDetail(response) {
     const data = await response.json().catch(() => ({}));
-    return data.detail;
+    const detail = data.detail;
+    if (typeof detail === "string")
+        return detail;
+    // Pydantic validation errors return detail as an array of error objects.
+    if (Array.isArray(detail) && detail.length > 0) {
+        const first = detail[0];
+        const msg = first.ctx?.error ?? first.msg ?? "";
+        return msg.replace(/^Value error,\s*/, "") || undefined;
+    }
+    return undefined;
 }
 async function apiLogin(email, password) {
     const response = await fetch("/auth/login", {
@@ -115,6 +124,7 @@ const headerGuest = document.getElementById("header-guest");
 const savePromptEl = document.getElementById("save-prompt");
 const savePromptLogin = document.getElementById("save-prompt-login");
 const btnDemoLogin = document.getElementById("btn-demo-login");
+const passwordHint = document.getElementById("password-hint");
 // =============================================================================
 // Auth Modal
 // =============================================================================
@@ -172,6 +182,7 @@ tabLogin.addEventListener("click", () => {
     tabRegister.classList.remove("active");
     authSubmit.textContent = "Log In";
     authError.textContent = "";
+    passwordHint.hidden = true;
 });
 tabRegister.addEventListener("click", () => {
     authMode = "register";
@@ -179,6 +190,7 @@ tabRegister.addEventListener("click", () => {
     tabLogin.classList.remove("active");
     authSubmit.textContent = "Register";
     authError.textContent = "";
+    passwordHint.hidden = false;
 });
 authForm.addEventListener("submit", async (e) => {
     e.preventDefault();

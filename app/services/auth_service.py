@@ -1,6 +1,6 @@
 from sqlmodel import Session, select
 from fastapi import HTTPException
-from app.models.user import UserCreate
+from app.models.user import UserCreate, UserLogin
 from app.db.schema import UserTable
 from app.core.security import create_token
 import bcrypt
@@ -36,7 +36,7 @@ class UserService():
         logger.info("New user registered: %s", new_user.email)
         return create_token(user.id)
 
-    def login_user(self, user: UserCreate) -> str:
+    def login_user(self, user: UserLogin) -> str:
         """Verify credentials and return a JWT. Raises 401 for any invalid combination."""
         existing_user = self._get_user_by_email(user.email)
         if not existing_user:

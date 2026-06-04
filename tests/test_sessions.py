@@ -80,12 +80,12 @@ def test_filter_sessions_by_tag(auth_client):
 
 def test_cannot_access_another_users_session(client):
     # User 1 registers and creates a session
-    client.post("/auth/register", json={"email": "user1@example.com", "password": "password123"})
+    client.post("/auth/register", json={"email": "user1@example.com", "password": "Password123"})
     session_response = client.post("/sessions", json={"duration_minutes": 25})
     session_id = session_response.json()["id"]
 
     # User 2 registers, this replaces the auth cookie, so the client is now logged in as user 2
-    client.post("/auth/register", json={"email": "user2@example.com", "password": "password123"})
+    client.post("/auth/register", json={"email": "user2@example.com", "password": "Password123"})
 
     # User 2 tries to fetch user 1's session
     response = client.get(f"/sessions/{session_id}")

@@ -25,7 +25,7 @@ def auth_client(client):
     # A client that is already logged in as a test user.
     response = client.post("/auth/register", json={
         "email": "test@example.com",
-        "password": "password123"
+        "password": "Password123"
     })
     assert response.status_code == 201, f"Setup failed: registration returned {response.status_code}"
     return client
@@ -43,7 +43,7 @@ def second_auth_client(second_client):
     # A second logged-in user, separate from auth_client.
     response = second_client.post("/auth/register", json={
         "email": "other@example.com",
-        "password": "password123"
+        "password": "Password123"
     })
     assert response.status_code == 201, f"Setup failed: registration returned {response.status_code}"
     return second_client
