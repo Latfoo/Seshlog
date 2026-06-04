@@ -1,12 +1,15 @@
 from sqlmodel import Session, select
 from fastapi import HTTPException
 from app.models.user import UserCreate, UserLogin
-from app.db.schema import UserTable
+from app.db.schema import UserTable, PomodoroSession, SessionTagLink
 from app.core.security import create_token
 import bcrypt
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+DEMO_EMAIL = "demo@example.com"
 
 
 class UserService():
@@ -49,3 +52,33 @@ class UserService():
 
         logger.warning("Login failed: wrong password for user %s", user.email)
         raise HTTPException(status_code=401, detail="Invalid email or password.")
+
+    def delete_user(self, user_id: int) -> None:
+        """Delete a user account and all their session data."""
+        user = self.db.get(UserTable, user_id)
+        if user and user.email == DEMO_EMAIL:
+            raise HTTPException(status_code=403, detail="The demo account cannot be deleted.")
+
+        session_ids = self.db.exec(
+            select(PomodoroSession.id).where(PomodoroSession.user_id == user_id)
+        ).all()
+
+        if session_ids:
+            for session_id in session_ids:
+                links = self.db.exec(
+                    select(SessionTagLink).where(SessionTagLink.session_id == session_id)
+                ).all()
+                for link in links:
+                    self.db.delete(link)
+
+            sessions = self.db.exec(
+                select(PomodoroSession).where(PomodoroSession.user_id == user_id)
+            ).all()
+            for session in sessions:
+                self.db.delete(session)
+
+        if user:
+            self.db.delete(user)
+
+        self.db.commit()
+        logger.info("Account deleted for user %d", user_id)

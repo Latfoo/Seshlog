@@ -561,6 +561,21 @@ select:disabled { opacity: 0.5; }
 .btn-logout:hover,
 .btn-login:hover { border-color: var(--accent); color: var(--accent); }
 
+.btn-delete-account {
+  background: none;
+  border: none;
+  padding: 6px 4px;
+  font-size: 0.75rem;
+  font-family: var(--font-body);
+  color: var(--muted);
+  cursor: pointer;
+  opacity: 0.6;
+  transition: all 0.15s;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.btn-delete-account:hover { color: #c0392b; opacity: 1; }
+
 /* Save prompt (shown after guest session completes) */
 
 .save-prompt {

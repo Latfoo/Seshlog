@@ -82,6 +82,12 @@ async function apiListTags() {
 async function apiGetStatistics(filterTag) {
     return fetchJson(filteredUrl("/statistics", filterTag));
 }
+async function apiDeleteAccount() {
+    const response = await fetch("/auth/account", { method: "DELETE", credentials: "include" });
+    if (!response.ok) {
+        throw new Error(await getErrorDetail(response) ?? "Something went wrong. Please try again.");
+    }
+}
 // =============================================================================
 // State
 // =============================================================================
@@ -119,6 +125,7 @@ const tabRegister = document.getElementById("tab-register");
 const headerUser = document.getElementById("header-user");
 const headerUname = document.getElementById("header-username");
 const btnLogout = document.getElementById("btn-logout");
+const btnDeleteAccount = document.getElementById("btn-delete-account");
 const btnLoginHeader = document.getElementById("btn-login-header");
 const headerGuest = document.getElementById("header-guest");
 const savePromptEl = document.getElementById("save-prompt");
@@ -225,6 +232,22 @@ btnLogout.addEventListener("click", async () => {
     if (activeSession !== null)
         resetTimerUI();
     showGuestState();
+});
+btnDeleteAccount.addEventListener("click", async () => {
+    const confirmed = window.confirm("Delete your account?\n\nThis will permanently delete your account and all session history. This cannot be undone.");
+    if (!confirmed)
+        return;
+    try {
+        await apiDeleteAccount();
+        localStorage.removeItem("username");
+        if (activeSession !== null)
+            resetTimerUI();
+        isLoggedIn = false;
+        showGuestState();
+    }
+    catch (err) {
+        alert(err.message ?? "Something went wrong. Please try again.");
+    }
 });
 btnDemoLogin.addEventListener("click", async () => {
     authMode = "login";

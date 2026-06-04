@@ -97,6 +97,13 @@ async function apiGetStatistics(filterTag?: string): Promise<Statistics> {
     return fetchJson(filteredUrl("/statistics", filterTag));
 }
 
+async function apiDeleteAccount(): Promise<void> {
+    const response = await fetch("/auth/account", { method: "DELETE", credentials: "include" });
+    if (!response.ok) {
+        throw new Error(await getErrorDetail(response) ?? "Something went wrong. Please try again.");
+    }
+}
+
 // =============================================================================
 // State
 // =============================================================================
@@ -134,9 +141,10 @@ const authError     = document.getElementById("auth-error")      as HTMLParagrap
 const authSubmit    = document.getElementById("auth-submit")     as HTMLButtonElement;
 const tabLogin      = document.getElementById("tab-login")       as HTMLButtonElement;
 const tabRegister   = document.getElementById("tab-register")    as HTMLButtonElement;
-const headerUser      = document.getElementById("header-user")       as HTMLElement;
-const headerUname     = document.getElementById("header-username")   as HTMLSpanElement;
-const btnLogout       = document.getElementById("btn-logout")        as HTMLButtonElement;
+const headerUser        = document.getElementById("header-user")         as HTMLElement;
+const headerUname       = document.getElementById("header-username")     as HTMLSpanElement;
+const btnLogout         = document.getElementById("btn-logout")          as HTMLButtonElement;
+const btnDeleteAccount  = document.getElementById("btn-delete-account")  as HTMLButtonElement;
 const btnLoginHeader  = document.getElementById("btn-login-header")  as HTMLButtonElement;
 const headerGuest     = document.getElementById("header-guest")      as HTMLElement;
 const savePromptEl    = document.getElementById("save-prompt")       as HTMLDivElement;
@@ -252,6 +260,23 @@ btnLogout.addEventListener("click", async () => {
     localStorage.removeItem("username");
     if (activeSession !== null) resetTimerUI();
     showGuestState();
+});
+
+btnDeleteAccount.addEventListener("click", async () => {
+    const confirmed = window.confirm(
+        "Delete your account?\n\nThis will permanently delete your account and all session history. This cannot be undone."
+    );
+    if (!confirmed) return;
+
+    try {
+        await apiDeleteAccount();
+        localStorage.removeItem("username");
+        if (activeSession !== null) resetTimerUI();
+        isLoggedIn = false;
+        showGuestState();
+    } catch (err: any) {
+        alert(err.message ?? "Something went wrong. Please try again.");
+    }
 });
 
 btnDemoLogin.addEventListener("click", async () => {

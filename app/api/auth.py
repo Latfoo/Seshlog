@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request, Response
+from fastapi import APIRouter, Depends, Request, Response
 from sqlmodel import Session
 
 from app.db.schema import engine
@@ -6,6 +6,7 @@ from app.models.user import UserCreate, UserLogin
 from app.services.auth_service import UserService
 from app.core.config import config
 from app.core.limiter import limiter
+from app.core.security import get_current_user
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -49,3 +50,12 @@ def logout(response: Response):
     # Deleting the cookie is enough to log out since the JWT lives in the cookie.
     response.delete_cookie(key="access_token", path="/")
     return {"message": "Logged out"}
+
+
+@router.delete("/account", status_code=200)
+@limiter.limit("5/minute")
+def delete_account(request: Request, response: Response, user_id: int = Depends(get_current_user)):
+    with Session(engine) as db:
+        UserService(db).delete_user(user_id)
+    response.delete_cookie(key="access_token", path="/")
+    return {"message": "Account deleted"}

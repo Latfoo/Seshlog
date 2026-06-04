@@ -122,3 +122,64 @@ def test_register_password_no_digit_returns_422(client):
 def test_register_password_empty_returns_422(client):
     response = client.post("/auth/register", json={"email": VALID_EMAIL, "password": ""})
     assert response.status_code == 422
+
+
+# --- Account deletion ---
+
+def test_delete_account_success(auth_client):
+    response = auth_client.delete("/auth/account")
+
+    assert response.status_code == 200
+
+
+def test_delete_account_clears_auth_cookie(auth_client):
+    auth_client.delete("/auth/account")
+
+    # Cookie should be gone, protected endpoints must return 401
+    response = auth_client.get("/sessions")
+    assert response.status_code == 401
+
+
+def test_delete_account_with_tagged_sessions(auth_client):
+    # Sessions with tags are the tricky case: SessionTagLink rows must be
+    # deleted before PomodoroSession rows or the FK constraint will fail.
+    auth_client.post("/sessions", json={"duration_minutes": 25, "tags": ["work", "deep-focus"]})
+    auth_client.post("/sessions", json={"duration_minutes": 10, "tags": ["admin"]})
+
+    response = auth_client.delete("/auth/account")
+
+    assert response.status_code == 200
+
+
+def test_delete_account_without_auth_returns_401(client):
+    response = client.delete("/auth/account")
+
+    assert response.status_code == 401
+
+
+def test_deleted_account_cannot_log_in(auth_client):
+    auth_client.delete("/auth/account")
+
+    response = auth_client.post("/auth/login", json={"email": "test@example.com", "password": "Password123"})
+
+    assert response.status_code == 401
+
+
+def test_delete_account_also_deletes_sessions(auth_client):
+    auth_client.post("/sessions", json={"duration_minutes": 25, "tags": []})
+    auth_client.post("/sessions", json={"duration_minutes": 10, "tags": ["work"]})
+
+    auth_client.delete("/auth/account")
+
+    # Re-register with same email to confirm sessions are gone
+    auth_client.post("/auth/register", json={"email": "test@example.com", "password": "Password123"})
+    response = auth_client.get("/sessions")
+    assert response.json() == []
+
+
+def test_demo_account_cannot_be_deleted(client):
+    client.post("/auth/register", json={"email": "demo@example.com", "password": "Password123"})
+
+    response = client.delete("/auth/account")
+
+    assert response.status_code == 403
