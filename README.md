@@ -1,6 +1,9 @@
 # Seshlog - Pomdoro Style Work Session Tracker
 
+Deployed: https://seshlog-production.up.railway.app/
+
 Pomodoro timer with a RESTful FastAPI and PostgreSQL backend. Sessions have a many-to-many relationship with tags, and the API tracks work sessions, statistics, and history per user with JWT authentication. You can start sessions, tag them by topic, pause and resume them, filter your history by tag, and view all-time totals alongside a 30-day activity chart. A TypeScript frontend ties it all together. The backend is covered by pytest integration tests that run against a real test database.
+Containerrised with Docker and deployed via Railway with a basic CI/CD setup in Github Actions.
 
 ## Features
 
@@ -25,6 +28,12 @@ Pomodoro timer with a RESTful FastAPI and PostgreSQL backend. Sessions have a ma
 - Auto-generated interactive API docs at `/docs`
 - Containerised with Docker Compose (backend + PostgreSQL)
 
+### Deployment
+
+- Deployed to Railway with a PostgreSQL service and environment variable management
+- GitHub Actions pipeline runs the full pytest suite on every push and blocks merges if tests fail
+- Passing builds on `main` trigger an automatic redeploy on Railway
+
 ## Tech stack
 
 | Layer            | Technology                     |
@@ -37,7 +46,9 @@ Pomodoro timer with a RESTful FastAPI and PostgreSQL backend. Sessions have a ma
 | Rate limiting    | slowapi                        |
 | Frontend         | TypeScript                     |
 | Testing          | pytest + FastAPI TestClient    |
-| Containerisation | Docker + Docker Compose        |
+| Containerisation | Docker                         |
+| CI/CD            | GitHub Actions                 |
+| Deployment       | Railway                        |
 
 ## API overview
 
