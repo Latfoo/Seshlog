@@ -49,6 +49,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Deploy to Railway
-        run: npx @railway/cli@latest up --detach
+        run: npx @railway/cli@latest up --detach --service ${{ secrets.RAILWAY_SERVICE_ID }}
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
